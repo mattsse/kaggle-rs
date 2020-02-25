@@ -1,3 +1,5 @@
+use crate::models::DatasetUploadFile;
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
@@ -14,23 +16,21 @@ pub struct DatasetNewVersionRequest {
     description: Option<String>,
     /// A list of files that should be associated with the dataset
     #[serde(rename = "files")]
-    files: Vec<::models::DatasetUploadFile>,
+    files: Vec<DatasetUploadFile>,
     /// Whether or not a tabular dataset should be converted to csv
     #[serde(rename = "convertToCsv")]
     convert_to_csv: Option<bool>,
     /// A list of tag IDs to associated with the dataset
     #[serde(rename = "categoryIds")]
     category_ids: Option<Vec<String>>,
-    /// Whether or not all previous versions of the dataset should be deleted upon creating the new version
+    /// Whether or not all previous versions of the dataset should be deleted
+    /// upon creating the new version
     #[serde(rename = "deleteOldVersions")]
     delete_old_versions: Option<bool>,
 }
 
 impl DatasetNewVersionRequest {
-    pub fn new(
-        version_notes: String,
-        files: Vec<::models::DatasetUploadFile>,
-    ) -> DatasetNewVersionRequest {
+    pub fn new(version_notes: String, files: Vec<DatasetUploadFile>) -> DatasetNewVersionRequest {
         DatasetNewVersionRequest {
             version_notes: version_notes,
             subtitle: None,
@@ -89,19 +89,16 @@ impl DatasetNewVersionRequest {
         self.description = None;
     }
 
-    pub fn set_files(&mut self, files: Vec<::models::DatasetUploadFile>) {
+    pub fn set_files(&mut self, files: Vec<DatasetUploadFile>) {
         self.files = files;
     }
 
-    pub fn with_files(
-        mut self,
-        files: Vec<::models::DatasetUploadFile>,
-    ) -> DatasetNewVersionRequest {
+    pub fn with_files(mut self, files: Vec<DatasetUploadFile>) -> DatasetNewVersionRequest {
         self.files = files;
         self
     }
 
-    pub fn files(&self) -> &Vec<::models::DatasetUploadFile> {
+    pub fn files(&self) -> &Vec<DatasetUploadFile> {
         &self.files
     }
 

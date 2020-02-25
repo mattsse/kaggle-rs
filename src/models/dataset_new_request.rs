@@ -1,5 +1,8 @@
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
+
+use crate::models::DatasetUploadFile;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatasetNewRequest {
@@ -23,7 +26,7 @@ pub struct DatasetNewRequest {
     description: Option<String>,
     /// A list of files that should be associated with the dataset
     #[serde(rename = "files")]
-    files: Vec<::models::DatasetUploadFile>,
+    files: Vec<DatasetUploadFile>,
     /// Whether or not the dataset should be private
     #[serde(rename = "isPrivate")]
     is_private: Option<bool>,
@@ -36,7 +39,7 @@ pub struct DatasetNewRequest {
 }
 
 impl DatasetNewRequest {
-    pub fn new(title: String, files: Vec<::models::DatasetUploadFile>) -> DatasetNewRequest {
+    pub fn new(title: String, files: Vec<DatasetUploadFile>) -> DatasetNewRequest {
         DatasetNewRequest {
             title: title,
             slug: None,
@@ -149,16 +152,16 @@ impl DatasetNewRequest {
         self.description = None;
     }
 
-    pub fn set_files(&mut self, files: Vec<::models::DatasetUploadFile>) {
+    pub fn set_files(&mut self, files: Vec<DatasetUploadFile>) {
         self.files = files;
     }
 
-    pub fn with_files(mut self, files: Vec<::models::DatasetUploadFile>) -> DatasetNewRequest {
+    pub fn with_files(mut self, files: Vec<DatasetUploadFile>) -> DatasetNewRequest {
         self.files = files;
         self
     }
 
-    pub fn files(&self) -> &Vec<::models::DatasetUploadFile> {
+    pub fn files(&self) -> &Vec<DatasetUploadFile> {
         &self.files
     }
 

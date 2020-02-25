@@ -1,12 +1,17 @@
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KernelPushRequest {
-    /// The kernel's ID number. One of `id` and `slug` are required. If both are specified, `id` will be preferred
+    /// The kernel's ID number. One of `id` and `slug` are required. If both are
+    /// specified, `id` will be preferred
     #[serde(rename = "id")]
     id: Option<i32>,
-    /// The full slug of the kernel to push to, in the format `USERNAME/KERNEL-SLUG`. The kernel slug must be the title lowercased with dashes (`-`) replacing spaces. One of `id` and `slug` are required. If both are specified, `id` will be preferred
+    /// The full slug of the kernel to push to, in the format
+    /// `USERNAME/KERNEL-SLUG`. The kernel slug must be the title lowercased
+    /// with dashes (`-`) replacing spaces. One of `id` and `slug` are required.
+    /// If both are specified, `id` will be preferred
     #[serde(rename = "slug")]
     slug: Option<String>,
     /// The title to be set on the kernel
@@ -30,13 +35,15 @@ pub struct KernelPushRequest {
     /// Whether or not the kernel should be able to access the internet
     #[serde(rename = "enableInternet")]
     enable_internet: Option<bool>,
-    /// A list of dataset data sources that the kernel should use. Each dataset is specified as `USERNAME/DATASET-SLUG`
+    /// A list of dataset data sources that the kernel should use. Each dataset
+    /// is specified as `USERNAME/DATASET-SLUG`
     #[serde(rename = "datasetDataSources")]
     dataset_data_sources: Option<Vec<String>>,
     /// A list of competition data sources that the kernel should use
     #[serde(rename = "competitionDataSources")]
     competition_data_sources: Option<Vec<String>>,
-    /// A list of kernel data sources that the kernel should use. Each dataset is specified as `USERNAME/KERNEL-SLUG`
+    /// A list of kernel data sources that the kernel should use. Each dataset
+    /// is specified as `USERNAME/KERNEL-SLUG`
     #[serde(rename = "kernelDataSources")]
     kernel_data_sources: Option<Vec<String>>,
     /// A list of tag IDs to associated with the dataset
@@ -45,7 +52,7 @@ pub struct KernelPushRequest {
 }
 
 impl KernelPushRequest {
-    pub fn new(text: String, language: String, kernel_type: String) -> KernelPushRequest {
+    pub fn new(text: String, language: String, kernel_type: String) -> Self {
         KernelPushRequest {
             id: None,
             slug: None,

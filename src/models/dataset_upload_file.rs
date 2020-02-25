@@ -1,9 +1,12 @@
+use crate::models::DatasetColumn;
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatasetUploadFile {
-    /// A token referencing a specific file upload that can be used across requests
+    /// A token referencing a specific file upload that can be used across
+    /// requests
     #[serde(rename = "token")]
     token: Option<String>,
     /// The file description
@@ -11,7 +14,7 @@ pub struct DatasetUploadFile {
     description: Option<String>,
     /// A list of dataset column metadata
     #[serde(rename = "columns")]
-    columns: Option<Vec<::models::DatasetColumn>>,
+    columns: Option<Vec<DatasetColumn>>,
 }
 
 impl DatasetUploadFile {
@@ -57,16 +60,16 @@ impl DatasetUploadFile {
         self.description = None;
     }
 
-    pub fn set_columns(&mut self, columns: Vec<::models::DatasetColumn>) {
+    pub fn set_columns(&mut self, columns: Vec<DatasetColumn>) {
         self.columns = Some(columns);
     }
 
-    pub fn with_columns(mut self, columns: Vec<::models::DatasetColumn>) -> DatasetUploadFile {
+    pub fn with_columns(mut self, columns: Vec<DatasetColumn>) -> DatasetUploadFile {
         self.columns = Some(columns);
         self
     }
 
-    pub fn columns(&self) -> Option<&Vec<::models::DatasetColumn>> {
+    pub fn columns(&self) -> Option<&Vec<DatasetColumn>> {
         self.columns.as_ref()
     }
 

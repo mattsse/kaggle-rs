@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
@@ -13,10 +14,7 @@ pub struct Collaborator {
 
 impl Collaborator {
     pub fn new(username: String, role: String) -> Collaborator {
-        Collaborator {
-            username: username,
-            role: role,
-        }
+        Collaborator { username, role }
     }
 
     pub fn set_username(&mut self, username: String) {
