@@ -4,8 +4,17 @@ use crate::models::{
     DatasetUpdateSettingsRequest,
     KernelPushRequest,
 };
+use serde::Deserialize;
 use std::fs::File;
 use std::rc::Rc;
+
+/// Describes API errors
+#[derive(Debug)]
+pub enum ApiError {
+    Unauthorized,
+    RateLimited(Option<usize>),
+    Other(u16),
+}
 
 pub struct KaggleApiClient {
     client: Rc<reqwest::Client>,
@@ -40,6 +49,18 @@ impl Configuration {
 }
 
 pub struct ApiResp;
+
+impl KaggleApiClient {
+    pub fn convert_result<'a, T: Deserialize<'a>>(&self, input: &'a str) -> Result<T, String> {
+        let result = serde_json::from_str::<T>(input).map_err(|e| {
+            format!(
+                "convert result failed, reason: {:?}; content: [{:?}]",
+                e, input
+            )
+        })?;
+        Ok(result)
+    }
+}
 
 impl KaggleApiClient {
     pub async fn competition_download_leaderboard(
