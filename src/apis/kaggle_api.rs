@@ -200,10 +200,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -275,10 +275,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -351,10 +351,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -427,10 +427,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -502,10 +502,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -581,10 +581,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -660,10 +660,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -738,10 +738,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -816,10 +816,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -896,10 +896,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -973,10 +973,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -1054,10 +1054,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -1137,10 +1137,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -1220,10 +1220,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1300,10 +1300,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1388,10 +1388,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1470,10 +1470,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1547,10 +1547,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1625,10 +1625,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -1702,10 +1702,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1779,10 +1779,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1855,10 +1855,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -1927,10 +1927,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 
@@ -2004,10 +2004,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -2090,10 +2090,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -2173,10 +2173,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Get;
 
@@ -2251,10 +2251,10 @@ impl<C: hyper::client::Connect> KaggleApi for KaggleApiClient<C> {
         let mut auth_query = HashMap::<String, String>::new();
         if let Some(ref auth_conf) = configuration.basic_auth {
             let auth = hyper::header::Authorization(hyper::header::Basic {
-                username: auth_conf.0.to_owned(),
-                password: auth_conf.1.to_owned(),
+                username: auth_conf.0.to_string(),
+                password: auth_conf.1.to_string(),
             });
-            auth_headers.insert("Authorization".to_owned(), auth.to_string());
+            auth_headers.insert("Authorization".to_string(), auth.to_string());
         };
         let method = hyper::Method::Post;
 

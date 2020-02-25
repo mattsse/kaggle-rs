@@ -21,8 +21,8 @@ pub struct ApiKey {
 impl<C: hyper::client::Connect> Configuration<C> {
     pub fn new(client: hyper::client::Client<C>) -> Configuration<C> {
         Configuration {
-            base_path: "https://www.kaggle.com/api/v1".to_owned(),
-            user_agent: Some("Swagger-Codegen/1/rust".to_owned()),
+            base_path: "https://www.kaggle.com/api/v1".to_string(),
+            user_agent: Some("Swagger-Codegen/1/rust".to_string()),
             client: client,
             basic_auth: None,
             oauth_access_token: None,
