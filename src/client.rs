@@ -1,11 +1,18 @@
+use crate::config::Config;
 use crate::models::{
     DatasetNewRequest,
     DatasetNewVersionRequest,
     DatasetUpdateSettingsRequest,
     KernelPushRequest,
 };
-use serde::Deserialize;
+use anyhow::{anyhow, Context};
+use reqwest::header::{self, HeaderMap};
+use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 /// Describes API errors
@@ -16,35 +23,148 @@ pub enum ApiError {
     Other(u16),
 }
 
+#[derive(Clone)]
 pub struct KaggleApiClient {
     client: Rc<reqwest::Client>,
 }
 
-pub type BasicAuth = (String, Option<String>);
-
-pub struct ApiKey {
-    pub prefix: Option<String>,
-    pub key: String,
+impl KaggleApiClient {
+    const HEADER_API_VERSION: &'static str = "X-Kaggle-ApiVersion";
 }
 
-pub struct Configuration {
-    pub base_path: String,
-    pub user_agent: Option<String>,
-    pub basic_auth: Option<BasicAuth>,
-    pub oauth_access_token: Option<String>,
-    pub api_key: Option<ApiKey>,
-    // TODO: take an oauth2 token source, similar to the go one
+#[derive(Debug, Clone, Default)]
+pub struct KaggleApiClientBuilder {
+    config: Option<Config>,
+    client: Option<Rc<reqwest::Client>>,
+    headers: Option<HeaderMap>,
 }
 
-impl Configuration {
-    pub fn new() -> Self {
-        Configuration {
-            base_path: "https://www.kaggle.com/api/v1".to_string(),
-            user_agent: Some("kaggele-rs/1/rust".to_string()),
-            basic_auth: None,
-            oauth_access_token: None,
-            api_key: None,
+impl KaggleApiClientBuilder {
+    fn default_headers() -> HeaderMap {
+        let mut headers = HeaderMap::with_capacity(3);
+
+        headers
+    }
+
+    pub fn headers(mut self, headers: HeaderMap) -> Self {
+        self.headers = Some(headers);
+        self
+    }
+
+    pub fn headers_mut(&mut self) -> &mut HeaderMap {
+        if self.headers.is_none() {
+            self.headers = Some(Self::default_headers());
         }
+        self.headers.as_mut().unwrap()
+    }
+
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn client(mut self, client: Rc<reqwest::Client>) -> Self {
+        self.client = Some(client);
+        self
+    }
+
+    // TODO should take an arg how to authenticate
+    pub fn authenticate(self, auth: Authentication) -> anyhow::Result<KaggleApiClient> {
+        let credentials = auth.credentials()?;
+
+        let mut headers = self.headers.unwrap_or_else(|| Self::default_headers());
+
+        let mut header_value = b"Basic ".to_vec();
+        {
+            // See [`reqwest::Request`]
+            let mut encoder =
+                base64::write::EncoderWriter::new(&mut header_value, base64::STANDARD);
+            write!(encoder, "{}:", credentials.user_name)?;
+            write!(encoder, "{}", credentials.key)?;
+        }
+
+        headers.insert(header::AUTHORIZATION, header_value.try_into()?);
+
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct KaggleCredentials {
+    user_name: String,
+    key: String,
+}
+
+impl KaggleCredentials {
+    fn from_env() -> anyhow::Result<Self> {
+        let user_name = std::env::var("KAGGLE_USERNAME")
+            .context("KAGGLE_USERNAME env variable not present.")?;
+        let key = std::env::var("KAGGLE_KEY").context("KAGGLE_KEY env variable not present.")?;
+        Ok(KaggleCredentials { user_name, key })
+    }
+
+    fn from_default_json() -> anyhow::Result<Self> {
+        if let Ok(path) = std::env::var("KAGGLE_CONFIG_DIR") {
+            Self::from_json(path)
+        } else {
+            Self::from_json(
+                dirs::home_dir()
+                    .map(|p| p.join(".kaggle/kaggle.json"))
+                    .context("Failed to detect home directory.")?,
+            )
+        }
+    }
+
+    fn from_json<T: AsRef<Path>>(path: T) -> anyhow::Result<Self> {
+        let path = path.as_ref();
+        if !path.exists() {
+            Err(anyhow!(
+                "kaggle config file {} does not exist",
+                path.display()
+            ))
+        } else {
+            let content = std::fs::read_to_string(path)?;
+            Ok(serde_json::from_str(&content)?)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Authentication {
+    /// Get the credentials from `KAGGLE_USERNAME` and `KAGGLE_KEY` env
+    /// variables.
+    Env,
+    ConfigFile {
+        /// Where the `kaggle.json` file is stored.
+        /// Default location is `~/.kaggle/kaggle.json` and on windows
+        /// `C:\Users\<Windows-username>\.kaggle\kaggle.json`
+        path: Option<PathBuf>,
+    },
+    /// Use dedicated credentials for authentication.
+    Credentials { user_name: String, key: String },
+}
+
+impl Authentication {
+    fn credentials(self) -> anyhow::Result<KaggleCredentials> {
+        match self {
+            Authentication::Env => KaggleCredentials::from_env(),
+            Authentication::ConfigFile { path } => {
+                if let Some(path) = path {
+                    KaggleCredentials::from_json(path)
+                } else {
+                    KaggleCredentials::from_default_json()
+                }
+            }
+            Authentication::Credentials { user_name, key } => {
+                Ok(KaggleCredentials { user_name, key })
+            }
+        }
+    }
+}
+
+impl Default for Authentication {
+    fn default() -> Self {
+        Authentication::ConfigFile { path: None }
     }
 }
 
