@@ -2,48 +2,28 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DatasetUpdateSettingsRequest {
     /// Title of the dataset
-    #[serde(rename = "title")]
     title: Option<String>,
     /// Subtitle of the dataset
-    #[serde(rename = "subtitle")]
     subtitle: Option<String>,
     /// Decription of the dataset
-    #[serde(rename = "description")]
     description: Option<String>,
     /// Whether or not the dataset should be private
     #[serde(rename = "isPrivate")]
     is_private: Option<bool>,
     /// A list of licenses that apply to this dataset
-    #[serde(rename = "licenses")]
     licenses: Option<Vec<Value>>,
     /// A list of keywords that apply to this dataset
-    #[serde(rename = "keywords")]
     keywords: Option<Vec<String>>,
     /// A list of collaborators that may read or edit this dataset
-    #[serde(rename = "collaborators")]
     collaborators: Option<Vec<Value>>,
     /// A list containing metadata for each file in the dataset
-    #[serde(rename = "data")]
     data: Option<Vec<Value>>,
 }
 
 impl DatasetUpdateSettingsRequest {
-    pub fn new() -> DatasetUpdateSettingsRequest {
-        DatasetUpdateSettingsRequest {
-            title: None,
-            subtitle: None,
-            description: None,
-            is_private: None,
-            licenses: None,
-            keywords: None,
-            collaborators: None,
-            data: None,
-        }
-    }
-
     pub fn set_title(&mut self, title: String) {
         self.title = Some(title);
     }

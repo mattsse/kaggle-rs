@@ -7,10 +7,8 @@ use crate::models::DatasetUploadFile;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatasetNewRequest {
     /// The title of the new dataset
-    #[serde(rename = "title")]
     title: String,
     /// The slug that the dataset should be created with
-    #[serde(rename = "slug")]
     slug: Option<String>,
     /// The owner's username
     #[serde(rename = "ownerSlug")]
@@ -19,13 +17,10 @@ pub struct DatasetNewRequest {
     #[serde(rename = "licenseName")]
     license_name: Option<String>,
     /// The subtitle to be set on the dataset
-    #[serde(rename = "subtitle")]
     subtitle: Option<String>,
     /// The description to be set on the dataset
-    #[serde(rename = "description")]
     description: Option<String>,
     /// A list of files that should be associated with the dataset
-    #[serde(rename = "files")]
     files: Vec<DatasetUploadFile>,
     /// Whether or not the dataset should be private
     #[serde(rename = "isPrivate")]
@@ -41,13 +36,13 @@ pub struct DatasetNewRequest {
 impl DatasetNewRequest {
     pub fn new(title: String, files: Vec<DatasetUploadFile>) -> DatasetNewRequest {
         DatasetNewRequest {
-            title: title,
+            title,
             slug: None,
             owner_slug: None,
             license_name: None,
             subtitle: None,
             description: None,
-            files: files,
+            files,
             is_private: None,
             convert_to_csv: None,
             category_ids: None,

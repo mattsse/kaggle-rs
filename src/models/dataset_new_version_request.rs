@@ -9,13 +9,10 @@ pub struct DatasetNewVersionRequest {
     #[serde(rename = "versionNotes")]
     version_notes: String,
     /// The subtitle to set on the dataset
-    #[serde(rename = "subtitle")]
     subtitle: Option<String>,
     /// The description to set on the dataset
-    #[serde(rename = "description")]
     description: Option<String>,
     /// A list of files that should be associated with the dataset
-    #[serde(rename = "files")]
     files: Vec<DatasetUploadFile>,
     /// Whether or not a tabular dataset should be converted to csv
     #[serde(rename = "convertToCsv")]
@@ -32,10 +29,10 @@ pub struct DatasetNewVersionRequest {
 impl DatasetNewVersionRequest {
     pub fn new(version_notes: String, files: Vec<DatasetUploadFile>) -> DatasetNewVersionRequest {
         DatasetNewVersionRequest {
-            version_notes: version_notes,
+            version_notes,
             subtitle: None,
             description: None,
-            files: files,
+            files,
             convert_to_csv: None,
             category_ids: None,
             delete_old_versions: None,

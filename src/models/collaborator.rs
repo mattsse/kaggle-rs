@@ -5,41 +5,24 @@ use serde_json::Value;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Collaborator {
     /// Username of the collaborator
-    #[serde(rename = "username")]
     username: String,
     /// Role of the collaborator
-    #[serde(rename = "role")]
     role: String,
 }
 
 impl Collaborator {
-    pub fn new(username: String, role: String) -> Collaborator {
-        Collaborator { username, role }
+    pub fn new<T: ToString, S: ToString>(username: T, role: S) -> Self {
+        Self {
+            username: username.to_string(),
+            role: role.to_string(),
+        }
     }
 
-    pub fn set_username(&mut self, username: String) {
-        self.username = username;
-    }
-
-    pub fn with_username(mut self, username: String) -> Collaborator {
-        self.username = username;
-        self
-    }
-
-    pub fn username(&self) -> &String {
+    pub fn username(&self) -> &str {
         &self.username
     }
 
-    pub fn set_role(&mut self, role: String) {
-        self.role = role;
-    }
-
-    pub fn with_role(mut self, role: String) -> Collaborator {
-        self.role = role;
-        self
-    }
-
-    pub fn role(&self) -> &String {
+    pub fn role(&self) -> &str {
         &self.role
     }
 }

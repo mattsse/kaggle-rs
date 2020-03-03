@@ -6,22 +6,18 @@ use serde_json::Value;
 pub struct KernelPushRequest {
     /// The kernel's ID number. One of `id` and `slug` are required. If both are
     /// specified, `id` will be preferred
-    #[serde(rename = "id")]
     id: Option<i32>,
     /// The full slug of the kernel to push to, in the format
     /// `USERNAME/KERNEL-SLUG`. The kernel slug must be the title lowercased
     /// with dashes (`-`) replacing spaces. One of `id` and `slug` are required.
     /// If both are specified, `id` will be preferred
-    #[serde(rename = "slug")]
     slug: Option<String>,
     /// The title to be set on the kernel
     #[serde(rename = "newTitle")]
     new_title: Option<String>,
     /// The kernel's source code
-    #[serde(rename = "text")]
     text: String,
     /// The language that the kernel is written in
-    #[serde(rename = "language")]
     language: String,
     /// The type of kernel. Cannot be changed once the kernel has been created
     #[serde(rename = "kernelType")]

@@ -2,18 +2,16 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DatasetColumn {
     /// The order that the column comes in, 0-based. (The first column is 0,
     /// second is 1, etc.)
-    #[serde(rename = "order")]
     order: Option<f32>,
     /// The column name
-    #[serde(rename = "name")]
     name: Option<String>,
     /// The type of all of the fields in the column. Please see the data types on https://github.com/Kaggle/kaggle-api/wiki/Dataset-Metadata
     #[serde(rename = "type")]
-    _type: Option<String>,
+    field_type: Option<String>,
     /// Used to store the original type of the column, which will be converted
     /// to Kaggle's types. For example, an `originalType` of `\"integer\"` would
     /// convert to a `type` of `\"numeric\"`
@@ -25,16 +23,6 @@ pub struct DatasetColumn {
 }
 
 impl DatasetColumn {
-    pub fn new() -> DatasetColumn {
-        DatasetColumn {
-            order: None,
-            name: None,
-            _type: None,
-            original_type: None,
-            description: None,
-        }
-    }
-
     pub fn set_order(&mut self, order: f32) {
         self.order = Some(order);
     }
@@ -70,20 +58,20 @@ impl DatasetColumn {
     }
 
     pub fn set_type(&mut self, _type: String) {
-        self._type = Some(_type);
+        self.field_type = Some(_type);
     }
 
     pub fn with_type(mut self, _type: String) -> DatasetColumn {
-        self._type = Some(_type);
+        self.field_type = Some(_type);
         self
     }
 
     pub fn get_type(&self) -> Option<&String> {
-        self._type.as_ref()
+        self.field_type.as_ref()
     }
 
     pub fn reset_type(&mut self) {
-        self._type = None;
+        self.field_type = None;
     }
 
     pub fn set_original_type(&mut self, original_type: String) {

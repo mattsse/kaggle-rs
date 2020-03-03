@@ -3,29 +3,18 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DatasetUploadFile {
     /// A token referencing a specific file upload that can be used across
     /// requests
-    #[serde(rename = "token")]
     token: Option<String>,
     /// The file description
-    #[serde(rename = "description")]
     description: Option<String>,
     /// A list of dataset column metadata
-    #[serde(rename = "columns")]
     columns: Option<Vec<DatasetColumn>>,
 }
 
 impl DatasetUploadFile {
-    pub fn new() -> DatasetUploadFile {
-        DatasetUploadFile {
-            token: None,
-            description: None,
-            columns: None,
-        }
-    }
-
     pub fn set_token(&mut self, token: String) {
         self.token = Some(token);
     }
