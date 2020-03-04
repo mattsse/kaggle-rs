@@ -1,12 +1,18 @@
 use crate::config::Config;
 use crate::models::{
-    DatasetNewRequest, DatasetNewVersionRequest, DatasetUpdateSettingsRequest, KernelPushRequest,
+    DatasetNewRequest,
+    DatasetNewVersionRequest,
+    DatasetUpdateSettingsRequest,
+    KernelPushRequest,
 };
 use anyhow::{anyhow, Context};
 use reqwest::header::{self, HeaderMap};
+use reqwest::{IntoUrl, StatusCode};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::fmt;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -20,9 +26,29 @@ pub enum ApiError {
     Other(u16),
 }
 
+impl std::error::Error for ApiError {}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ApiError::Unauthorized => write!(f, "Unauthorized request to API"),
+            ApiError::RateLimited(e) => {
+                if let Some(d) = e {
+                    write!(f, "Exceeded API request limit - please wait {} seconds", d)
+                } else {
+                    write!(f, "Exceeded API request limit")
+                }
+            }
+            ApiError::Other(s) => write!(f, "Kaggle API reported error code {}", s),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct KaggleApiClient {
     client: Rc<reqwest::Client>,
+    config: Config,
+    credentials: KaggleCredentials,
 }
 
 impl KaggleApiClient {
@@ -71,8 +97,9 @@ impl KaggleApiClientBuilder {
         self
     }
 
-    // TODO should take an arg how to authenticate
     pub fn build(self) -> anyhow::Result<KaggleApiClient> {
+        let config = self.config.unwrap_or_default();
+
         let credentials = self
             .auth
             .unwrap_or_else(|| Authentication::default())
@@ -85,13 +112,33 @@ impl KaggleApiClientBuilder {
             // See [`reqwest::Request`]
             let mut encoder =
                 base64::write::EncoderWriter::new(&mut header_value, base64::STANDARD);
-            write!(encoder, "{}:", credentials.user_name)?;
-            write!(encoder, "{}", credentials.key)?;
+            write!(encoder, "{}:", &credentials.user_name)?;
+            write!(encoder, "{}", &credentials.key)?;
         }
 
         headers.insert(header::AUTHORIZATION, header_value.try_into()?);
+        headers.insert(header::USER_AGENT, config.user_agent.parse()?);
+        // TODO json default?
+        headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/json"),
+        );
 
-        unimplemented!()
+        let client = if let Some(client) = self.client {
+            client
+        } else {
+            Rc::new(
+                reqwest::Client::builder()
+                    .default_headers(headers)
+                    .build()?,
+            )
+        };
+
+        Ok(KaggleApiClient {
+            client,
+            config,
+            credentials,
+        })
     }
 }
 
@@ -177,14 +224,48 @@ impl Default for Authentication {
 pub struct ApiResp;
 
 impl KaggleApiClient {
-    pub fn convert_result<'a, T: Deserialize<'a>>(&self, input: &'a str) -> Result<T, String> {
-        let result = serde_json::from_str::<T>(input).map_err(|e| {
-            format!(
-                "convert result failed, reason: {:?}; content: [{:?}]",
-                e, input
-            )
-        })?;
-        Ok(result)
+    async fn get<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
+        Ok(Self::request(self.client.get(url)).await?.text().await?)
+    }
+
+    async fn post_json<T: DeserializeOwned, U: IntoUrl, B: Into<reqwest::Body>>(
+        &self,
+        url: U,
+        body: Option<B>,
+    ) -> anyhow::Result<T> {
+        let mut req = self.client.post(url);
+        if let Some(body) = body {
+            req = req.body(body);
+        }
+        Ok(Self::request(req).await?.json::<T>().await?)
+    }
+
+    async fn get_json<T: DeserializeOwned, U: IntoUrl>(&self, url: U) -> anyhow::Result<T> {
+        Ok(Self::request(self.client.get(url))
+            .await?
+            .json::<T>()
+            .await?)
+    }
+
+    async fn request(mut req: reqwest::RequestBuilder) -> anyhow::Result<reqwest::Response> {
+        let resp = req.send().await?;
+
+        if resp.status().is_success() {
+            Ok(resp)
+        } else {
+            let err = match resp.status() {
+                StatusCode::UNAUTHORIZED => ApiError::Unauthorized,
+                StatusCode::TOO_MANY_REQUESTS => {
+                    if let Ok(duration) = resp.headers()[reqwest::header::RETRY_AFTER].to_str() {
+                        ApiError::RateLimited(duration.parse::<usize>().ok())
+                    } else {
+                        ApiError::RateLimited(None)
+                    }
+                }
+                status => ApiError::Other(status.as_u16()),
+            };
+            Err(err)?
+        }
     }
 }
 
@@ -195,12 +276,14 @@ impl KaggleApiClient {
     ) -> Result<ApiResp, serde_json::Value> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn competition_view_leaderboard(
         &self,
         id: &str,
     ) -> Result<ApiResp, serde_json::Value> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn competitions_data_download_file(
         &self,
         id: &str,
@@ -230,6 +313,7 @@ impl KaggleApiClient {
     ) -> Result<ApiResp, serde_json::Value> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn competitions_submissions_list(
         &self,
         id: &str,

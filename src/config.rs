@@ -11,7 +11,7 @@ impl ApiKey {}
 #[derive(Debug, Clone)]
 pub struct Config {
     pub base_path: String,
-    pub user_agent: Option<String>,
+    pub user_agent: String,
     pub basic_auth: Option<BasicAuth>,
     pub oauth_access_token: Option<String>,
     pub api_key: Option<ApiKey>,
@@ -28,7 +28,7 @@ impl Config {
     pub fn new() -> Self {
         Config {
             base_path: "https://www.kaggle.com/api/v1".to_string(),
-            user_agent: Some("kaggele-rs/1/rust".to_string()),
+            user_agent: "kaggele-rs/1/rust".to_string(),
             basic_auth: None,
             oauth_access_token: None,
             api_key: None,
