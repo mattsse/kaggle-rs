@@ -1,9 +1,6 @@
 use crate::config::Config;
 use crate::models::{
-    DatasetNewRequest,
-    DatasetNewVersionRequest,
-    DatasetUpdateSettingsRequest,
-    KernelPushRequest,
+    DatasetNewRequest, DatasetNewVersionRequest, DatasetUpdateSettingsRequest, KernelPushRequest,
 };
 use anyhow::{anyhow, Context};
 use reqwest::header::{self, HeaderMap};
@@ -37,6 +34,7 @@ pub struct KaggleApiClientBuilder {
     config: Option<Config>,
     client: Option<Rc<reqwest::Client>>,
     headers: Option<HeaderMap>,
+    auth: Option<Authentication>,
 }
 
 impl KaggleApiClientBuilder {
@@ -68,9 +66,17 @@ impl KaggleApiClientBuilder {
         self
     }
 
+    pub fn auth(mut self, auth: Authentication) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
     // TODO should take an arg how to authenticate
-    pub fn authenticate(self, auth: Authentication) -> anyhow::Result<KaggleApiClient> {
-        let credentials = auth.credentials()?;
+    pub fn build(self) -> anyhow::Result<KaggleApiClient> {
+        let credentials = self
+            .auth
+            .unwrap_or_else(|| Authentication::default())
+            .credentials()?;
 
         let mut headers = self.headers.unwrap_or_else(|| Self::default_headers());
 
