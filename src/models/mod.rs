@@ -16,6 +16,7 @@ mod dataset_new_version_request;
 mod dataset_update_settings_request;
 mod dataset_upload_file;
 mod error;
+mod extended;
 mod kernel_push_request;
 mod license;
 mod result;
