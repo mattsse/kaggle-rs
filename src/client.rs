@@ -5,9 +5,10 @@ use crate::models::{
     DatasetUpdateSettingsRequest,
     KernelPushRequest,
 };
+use crate::request::CompetitionsList;
 use anyhow::{anyhow, Context};
 use reqwest::header::{self, HeaderMap};
-use reqwest::{IntoUrl, StatusCode};
+use reqwest::{IntoUrl, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -53,6 +54,12 @@ pub struct KaggleApiClient {
 
 impl KaggleApiClient {
     const HEADER_API_VERSION: &'static str = "X-Kaggle-ApiVersion";
+
+    /// Convenience method to create a [`KaggleApiClientBuilder`]
+    #[inline]
+    pub fn builder() -> KaggleApiClientBuilder {
+        KaggleApiClientBuilder::default()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -267,20 +274,30 @@ impl KaggleApiClient {
             Err(err)?
         }
     }
+
+    fn join_url<T: AsRef<str>>(&self, path: T) -> anyhow::Result<Url> {
+        Ok(self.config.base_url.join(path.as_ref())?)
+    }
 }
 
 impl KaggleApiClient {
-    pub async fn competition_download_leaderboard(
+    /// Returns a list of `Competition'  instances.
+    pub async fn competitions_list(
         &self,
-        id: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+        competition: CompetitionsList,
+    ) -> anyhow::Result<ApiResp> {
+        let req = self
+            .client
+            .get(self.join_url("competitions/list")?)
+            .query(&[competition]);
         unimplemented!("Not implemented yet.")
     }
 
-    pub async fn competition_view_leaderboard(
-        &self,
-        id: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    pub async fn competition_download_leaderboard(&self, id: &str) -> anyhow::Result<ApiResp> {
+        unimplemented!("Not implemented yet.")
+    }
+
+    pub async fn competition_view_leaderboard(&self, id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
@@ -288,37 +305,22 @@ impl KaggleApiClient {
         &self,
         id: &str,
         file_name: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
-    pub async fn competitions_data_download_files(
-        &self,
-        id: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    pub async fn competitions_data_download_files(&self, id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
-    pub async fn competitions_data_list_files(
-        &self,
-        id: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
-        unimplemented!("Not implemented yet.")
-    }
-    pub async fn competitions_list(
-        &self,
-        group: &str,
-        category: &str,
-        sort_by: &str,
-        page: i32,
-        search: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
+    /// Get the list of Submission for a particular competition
     pub async fn competitions_submissions_list(
         &self,
         id: &str,
-        page: i32,
-    ) -> Result<ApiResp, serde_json::Value> {
+        page: usize,
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn competitions_submissions_submit(
@@ -326,7 +328,7 @@ impl KaggleApiClient {
         blob_file_tokens: &str,
         submission_description: &str,
         id: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn competitions_submissions_upload(
@@ -335,7 +337,7 @@ impl KaggleApiClient {
         guid: &str,
         content_length: i32,
         last_modified_date_utc: i32,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn competitions_submissions_url(
@@ -344,13 +346,13 @@ impl KaggleApiClient {
         content_length: i32,
         last_modified_date_utc: i32,
         file_name: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_create_new(
         &self,
         dataset_new_request: DatasetNewRequest,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_create_version(
@@ -358,14 +360,14 @@ impl KaggleApiClient {
         owner_slug: &str,
         dataset_slug: &str,
         dataset_new_version_request: DatasetNewVersionRequest,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_create_version_by_id(
         &self,
         id: i32,
         dataset_new_version_request: DatasetNewVersionRequest,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_download(
@@ -373,7 +375,7 @@ impl KaggleApiClient {
         owner_slug: &str,
         dataset_slug: &str,
         dataset_version_number: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_download_file(
@@ -382,7 +384,7 @@ impl KaggleApiClient {
         dataset_slug: &str,
         file_name: &str,
         dataset_version_number: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_list(
@@ -395,24 +397,24 @@ impl KaggleApiClient {
         tagids: &str,
         search: &str,
         user: &str,
-        page: i32,
+        page: usize,
         max_size: i64,
         min_size: i64,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_list_files(
         &self,
         owner_slug: &str,
         dataset_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_status(
         &self,
         owner_slug: &str,
         dataset_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_upload_file(
@@ -420,46 +422,42 @@ impl KaggleApiClient {
         file_name: &str,
         content_length: i32,
         last_modified_date_utc: i32,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_view(
         &self,
         owner_slug: &str,
         dataset_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn kernel_output(
         &self,
         user_name: &str,
         kernel_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
-    pub async fn kernel_pull(
-        &self,
-        user_name: &str,
-        kernel_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    pub async fn kernel_pull(&self, user_name: &str, kernel_slug: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn kernel_push(
         &self,
         kernel_push_request: KernelPushRequest,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn kernel_status(
         &self,
         user_name: &str,
         kernel_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn kernels_list(
         &self,
-        page: i32,
+        page: usize,
         page_size: i32,
         search: &str,
         group: &str,
@@ -471,14 +469,14 @@ impl KaggleApiClient {
         dataset: &str,
         competition: &str,
         parent_kernel: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn metadata_get(
         &self,
         owner_slug: &str,
         dataset_slug: &str,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn metadata_post(
@@ -486,7 +484,17 @@ impl KaggleApiClient {
         owner_slug: &str,
         dataset_slug: &str,
         settings: DatasetUpdateSettingsRequest,
-    ) -> Result<ApiResp, serde_json::Value> {
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn competition_query() {
+        // let client = KaggleApiClient::builder().build().unwrap()
     }
 }
