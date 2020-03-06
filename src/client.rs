@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::models::extended::{File, LeaderboardEntry, Submission};
 use crate::models::{
     DatasetNewRequest,
     DatasetNewVersionRequest,
@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt;
-use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -48,7 +47,7 @@ impl fmt::Display for ApiError {
 #[derive(Clone)]
 pub struct KaggleApiClient {
     client: Rc<reqwest::Client>,
-    config: Config,
+    base_url: Url,
     credentials: KaggleCredentials,
 }
 
@@ -62,9 +61,10 @@ impl KaggleApiClient {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct KaggleApiClientBuilder {
-    config: Option<Config>,
+    base_url: Url,
+    user_agent: Option<String>,
     client: Option<Rc<reqwest::Client>>,
     headers: Option<HeaderMap>,
     auth: Option<Authentication>,
@@ -73,7 +73,7 @@ pub struct KaggleApiClientBuilder {
 impl KaggleApiClientBuilder {
     fn default_headers() -> HeaderMap {
         let mut headers = HeaderMap::with_capacity(3);
-
+        // TODO do i need this at all?
         headers
     }
 
@@ -89,8 +89,8 @@ impl KaggleApiClientBuilder {
         self.headers.as_mut().unwrap()
     }
 
-    pub fn config(mut self, config: Config) -> Self {
-        self.config = Some(config);
+    pub fn user_agent<T: ToString>(mut self, user_agent: T) -> Self {
+        self.user_agent = Some(user_agent.to_string());
         self
     }
 
@@ -105,8 +105,6 @@ impl KaggleApiClientBuilder {
     }
 
     pub fn build(self) -> anyhow::Result<KaggleApiClient> {
-        let config = self.config.unwrap_or_default();
-
         let credentials = self
             .auth
             .unwrap_or_else(|| Authentication::default())
@@ -124,7 +122,14 @@ impl KaggleApiClientBuilder {
         }
 
         headers.insert(header::AUTHORIZATION, header_value.try_into()?);
-        headers.insert(header::USER_AGENT, config.user_agent.parse()?);
+        if let Some(user_agent) = self.user_agent {
+            headers.insert(header::USER_AGENT, user_agent.parse()?);
+        } else {
+            headers.insert(
+                header::USER_AGENT,
+                header::HeaderValue::from_static("kaggele-rs/1/rust"),
+            );
+        }
         // TODO json default?
         headers.insert(
             header::CONTENT_TYPE,
@@ -143,9 +148,21 @@ impl KaggleApiClientBuilder {
 
         Ok(KaggleApiClient {
             client,
-            config,
+            base_url: self.base_url,
             credentials,
         })
+    }
+}
+
+impl Default for KaggleApiClientBuilder {
+    fn default() -> Self {
+        Self {
+            base_url: "https://www.kaggle.com/api/v1".parse().unwrap(),
+            user_agent: None,
+            client: None,
+            headers: None,
+            auth: None,
+        }
     }
 }
 
@@ -254,6 +271,7 @@ impl KaggleApiClient {
             .await?)
     }
 
+    /// Execute the request.
     async fn request(mut req: reqwest::RequestBuilder) -> anyhow::Result<reqwest::Response> {
         let resp = req.send().await?;
 
@@ -276,7 +294,7 @@ impl KaggleApiClient {
     }
 
     fn join_url<T: AsRef<str>>(&self, path: T) -> anyhow::Result<Url> {
-        Ok(self.config.base_url.join(path.as_ref())?)
+        Ok(self.base_url.join(path.as_ref())?)
     }
 }
 
