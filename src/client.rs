@@ -315,10 +315,18 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
-    pub async fn competition_view_leaderboard(&self, id: &str) -> anyhow::Result<ApiResp> {
+    /// View a leaderboard based on a competition name
+    pub async fn competition_view_leaderboard(
+        &self,
+        id: &str,
+    ) -> anyhow::Result<Vec<LeaderboardEntry>> {
+        let req = self
+            .client
+            .get(self.join_url(format!("/competitions/{}/leaderboard/view", id))?);
         unimplemented!("Not implemented yet.")
     }
 
+    ///
     pub async fn competitions_data_download_file(
         &self,
         id: &str,
@@ -326,10 +334,17 @@ impl KaggleApiClient {
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
+    ///
     pub async fn competitions_data_download_files(&self, id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
-    pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<ApiResp> {
+
+    ///
+    pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<Vec<File>> {
+        let req = self
+            .client
+            .get(self.join_url(format!("/competitions/data/list/{}", id))?);
         unimplemented!("Not implemented yet.")
     }
 
@@ -338,9 +353,16 @@ impl KaggleApiClient {
         &self,
         id: &str,
         page: usize,
-    ) -> anyhow::Result<ApiResp> {
+    ) -> anyhow::Result<Vec<Submission>> {
+        let req = self
+            .client
+            .get(self.join_url(format!("/competitions/submissions/list/{}", id))?)
+            .query(&[("page", page)]);
+
         unimplemented!("Not implemented yet.")
     }
+
+    ///
     pub async fn competitions_submissions_submit(
         &self,
         blob_file_tokens: &str,
@@ -349,6 +371,8 @@ impl KaggleApiClient {
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
+    ///
     pub async fn competitions_submissions_upload(
         &self,
         file: File,
