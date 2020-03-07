@@ -8,10 +8,10 @@ use std::time::Duration;
 use bytes::Bytes;
 use futures::stream::{self, Stream, StreamExt, TryStreamExt};
 use reqwest::header::{self, HeaderMap, HeaderValue};
-use reqwest::{IntoUrl, StatusCode, Url};
+use reqwest::{multipart, IntoUrl, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec;
 
 use anyhow::{anyhow, Context};
@@ -56,6 +56,7 @@ pub struct KaggleApiClient {
     client: Rc<reqwest::Client>,
     base_url: Url,
     credentials: KaggleCredentials,
+    download_dir: PathBuf,
 }
 
 impl KaggleApiClient {
@@ -66,6 +67,11 @@ impl KaggleApiClient {
     pub fn builder() -> KaggleApiClientBuilder {
         KaggleApiClientBuilder::default()
     }
+
+    /// The directory where downloads are stored.
+    pub fn download_dir(&self) -> &PathBuf {
+        &self.download_dir
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +81,7 @@ pub struct KaggleApiClientBuilder {
     client: Option<Rc<reqwest::Client>>,
     headers: Option<HeaderMap>,
     auth: Option<Authentication>,
+    download_dir: Option<PathBuf>,
 }
 
 impl KaggleApiClientBuilder {
@@ -86,6 +93,11 @@ impl KaggleApiClientBuilder {
 
     pub fn headers(mut self, headers: HeaderMap) -> Self {
         self.headers = Some(headers);
+        self
+    }
+
+    pub fn download_dir<T: Into<PathBuf>>(mut self, download_dir: T) -> Self {
+        self.download_dir = Some(download_dir.into());
         self
     }
 
@@ -134,7 +146,11 @@ impl KaggleApiClientBuilder {
         } else {
             headers.insert(
                 header::USER_AGENT,
-                HeaderValue::from_static("kaggele-rs/1/rust"),
+                HeaderValue::from_static(concat!(
+                    env!("CARGO_PKG_NAME"),
+                    "/",
+                    env!("CARGO_PKG_VERSION"),
+                )),
             );
         }
         // TODO json default?
@@ -153,10 +169,17 @@ impl KaggleApiClientBuilder {
             )
         };
 
+        let download_dir = if let Some(path) = self.download_dir {
+            path
+        } else {
+            tempdir::TempDir::new("kaggle-rs")?.into_path()
+        };
+
         Ok(KaggleApiClient {
             client,
             base_url: self.base_url,
             credentials,
+            download_dir,
         })
     }
 }
@@ -169,6 +192,7 @@ impl Default for KaggleApiClientBuilder {
             client: None,
             headers: None,
             auth: None,
+            download_dir: None,
         }
     }
 }
@@ -313,23 +337,58 @@ impl KaggleApiClient {
     fn join_url<T: AsRef<str>>(&self, path: T) -> anyhow::Result<Url> {
         Ok(self.base_url.join(path.as_ref())?)
     }
+
+    /// Write the request's response to the provided output destination.
+    async fn download_file(
+        mut req: reqwest::RequestBuilder,
+        output: impl AsRef<Path>,
+    ) -> anyhow::Result<PathBuf> {
+        let mut res = req.send().await?;
+
+        let output = output.as_ref();
+        let mut file = tokio::fs::File::create(output).await?;
+
+        while let Some(chunk) = res.chunk().await? {
+            file.write_all(&chunk).await?;
+        }
+        Ok(output.to_path_buf())
+    }
 }
 
 impl KaggleApiClient {
     /// Returns a list of `Competition'  instances.
+    ///
+    /// `Vec<Competition>`
     pub async fn competitions_list(
         &self,
         competition: CompetitionsList,
-    ) -> anyhow::Result<ApiResp> {
-        let req = self
-            .client
-            .get(self.join_url("competitions/list")?)
-            .query(&competition);
-        unimplemented!("Not implemented yet.")
+    ) -> anyhow::Result<serde_json::Value> {
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url("competitions/list")?)
+                .query(&competition),
+        )
+        .await?)
     }
 
-    pub async fn competition_download_leaderboard(&self, _id: &str) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+    /// Download competition leaderboard
+    pub async fn competition_download_leaderboard<T: AsRef<Path>>(
+        &self,
+        id: &str,
+        target: Option<T>,
+    ) -> anyhow::Result<PathBuf> {
+        let output = if let Some(target) = target {
+            target.as_ref().to_path_buf()
+        } else {
+            self.download_dir.join(format!("{}-leaderboard.zip", id))
+        };
+
+        Ok(Self::download_file(
+            self.client
+                .get(self.join_url(format!("/competitions/{}/leaderboard/download", id))?),
+            output,
+        )
+        .await?)
     }
 
     /// View a leaderboard based on a competition name
@@ -337,32 +396,62 @@ impl KaggleApiClient {
         &self,
         id: &str,
     ) -> anyhow::Result<Vec<LeaderboardEntry>> {
-        let req = self
-            .client
-            .get(self.join_url(format!("/competitions/{}/leaderboard/view", id))?);
-        unimplemented!("Not implemented yet.")
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url(format!("/competitions/{}/leaderboard/view", id))?),
+        )
+        .await?)
     }
 
-    ///
-    pub async fn competitions_data_download_file(
+    /// Download a competition data file to a designated location, or use a
+    /// default location
+    pub async fn competitions_data_download_file<T: AsRef<Path>>(
         &self,
-        _id: &str,
-        _file_name: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        id: &str,
+        file_name: &str,
+        target: Option<T>,
+    ) -> anyhow::Result<PathBuf> {
+        let output = if let Some(target) = target {
+            target.as_ref().to_path_buf()
+        } else {
+            self.download_dir.join(format!("{}.zip", id))
+        };
+
+        Ok(Self::download_file(
+            self.client
+                .get(self.join_url(format!("/competitions/data/download/{}/{}", id, file_name))?),
+            output,
+        )
+        .await?)
     }
 
-    ///
-    pub async fn competitions_data_download_files(&self, _id: &str) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+    /// Downloads all competition files
+    pub async fn competitions_data_download_files<T: AsRef<Path>>(
+        &self,
+        id: &str,
+        target: Option<T>,
+    ) -> anyhow::Result<PathBuf> {
+        let output = if let Some(target) = target {
+            target.as_ref().to_path_buf()
+        } else {
+            self.download_dir.join(format!("{}.zip", id))
+        };
+
+        Ok(Self::download_file(
+            self.client
+                .get(self.join_url(format!(" /competitions/data/download-all/{}", id))?),
+            output,
+        )
+        .await?)
     }
 
     ///
     pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<Vec<File>> {
-        let req = self
-            .client
-            .get(self.join_url(format!("/competitions/data/list/{}", id))?);
-        unimplemented!("Not implemented yet.")
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url(format!("/competitions/data/list/{}", id))?),
+        )
+        .await?)
     }
 
     /// Get the list of Submission for a particular competition
@@ -376,29 +465,34 @@ impl KaggleApiClient {
             .get(self.join_url(format!("/competitions/submissions/list/{}", id))?)
             .query(&[("page", page)]);
 
-        unimplemented!("Not implemented yet.")
+        Ok(Self::request_json(req).await?)
     }
 
-    ///
+    /// Submit to competition.
     pub async fn competitions_submissions_submit(
         &self,
-        _id: &str,
-        _blob_file_tokens: &str,
-        _submission_description: Option<String>,
+        id: impl AsRef<str>,
+        blob_file_tokens: impl ToString,
+        submission_description: impl ToString,
     ) -> anyhow::Result<SubmitResult> {
-        // last modified: Return the last modification time of a file,
-        // content_length: size of the file
+        let form = multipart::Form::new()
+            .text("blobFileTokens", blob_file_tokens.to_string())
+            .text("submissionDescription", submission_description.to_string());
 
-        // TODO call self.competitions_submissions_url
-        unimplemented!("Not implemented yet.")
+        Ok(Self::request_json(
+            self.client
+                .post(self.join_url(format!("/competitions/submissions/submit/{}", id.as_ref()))?)
+                .multipart(form),
+        )
+        .await?)
     }
 
     /// Submit a competition
-    pub async fn competition_submit<S: AsRef<Path>, T: AsRef<str>>(
+    pub async fn competition_submit(
         &self,
-        file: S,
-        competition: T,
-        message: Option<String>,
+        file: impl AsRef<Path>,
+        competition: impl AsRef<str>,
+        message: impl ToString,
     ) -> anyhow::Result<SubmitResult> {
         let competition = competition.as_ref();
         let file = file.as_ref();
@@ -451,7 +545,8 @@ impl KaggleApiClient {
                     .and_then(serde_json::Value::as_str)
                     .context("Missing createUrl in response")?,
             )
-            .await?
+            .await?;
+            url_result
         };
 
         let token = upload_result
@@ -461,45 +556,62 @@ impl KaggleApiClient {
             .context("Missing upload token")?;
 
         Ok(self
-            .competitions_submissions_submit(competition.as_ref(), token, message)
+            .competitions_submissions_submit(competition, token, message)
             .await?)
     }
 
-    pub async fn upload_complete<T: AsRef<Path>, U: IntoUrl>(
+    pub async fn upload_complete(
         &self,
-        file: T,
-        url: U,
+        file: impl AsRef<Path>,
+        url: impl IntoUrl,
     ) -> anyhow::Result<serde_json::Value> {
         let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
 
-        let req = self
-            .client
-            .put(url)
-            .body(reqwest::Body::wrap_stream(stream));
-
-        unimplemented!()
+        Ok(Self::request_json(
+            self.client
+                .put(url)
+                .body(reqwest::Body::wrap_stream(stream)),
+        )
+        .await?)
     }
 
     /// Upload competition submission file
-    pub async fn competitions_submissions_upload<T: AsRef<Path>>(
+    pub async fn competitions_submissions_upload(
         &self,
-        _file: T,
-        _guid: &str,
-        _content_length: u64,
-        _last_modified_date_utc: Duration,
+        file: impl AsRef<Path>,
+        guid: impl AsRef<str>,
+        content_length: u64,
+        last_modified_date_utc: Duration,
     ) -> anyhow::Result<serde_json::Value> {
-        unimplemented!("Not implemented yet.")
+        let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
+
+        let form = multipart::Form::new().part(
+            "file",
+            multipart::Part::stream(reqwest::Body::wrap_stream(stream)),
+        );
+
+        let req = self
+            .client
+            .post(self.join_url(format!(
+                "/competitions/submissions/upload/{}/{}/{}",
+                guid.as_ref(),
+                content_length,
+                last_modified_date_utc.as_secs()
+            ))?)
+            .multipart(form);
+
+        Ok(Self::request_json(req).await?)
     }
 
     /// Generate competition submission URL
-    pub async fn competitions_submissions_url<S: AsRef<str>, T: ToString>(
+    pub async fn competitions_submissions_url(
         &self,
-        id: S,
+        id: impl AsRef<str>,
         content_length: u64,
         last_modified_date_utc: Duration,
-        file_name: T,
+        file_name: impl ToString,
     ) -> anyhow::Result<serde_json::Value> {
-        let form = reqwest::multipart::Form::new().text("fileName", file_name.to_string());
+        let form = multipart::Form::new().text("fileName", file_name.to_string());
 
         let req = self
             .client
@@ -509,17 +621,13 @@ impl KaggleApiClient {
                 content_length,
                 last_modified_date_utc.as_secs()
             ))?)
-            .header(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("multipart/form-data"),
-            )
             .multipart(form);
         Ok(Self::request_json(req).await?)
     }
 
     pub async fn datasets_create_new(
         &self,
-        _dataset_req: DatasetNewRequest,
+        dataset_req: DatasetNewRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
@@ -676,6 +784,22 @@ impl KaggleApiClient {
     }
 }
 
+fn into_byte_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<u8>>
+where
+    R: AsyncRead,
+{
+    codec::FramedRead::new(r, codec::BytesCodec::new())
+        .map_ok(|bytes| stream::iter(bytes).map(Ok))
+        .try_flatten()
+}
+
+fn into_bytes_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<Bytes>>
+where
+    R: AsyncRead,
+{
+    codec::FramedRead::new(r, codec::BytesCodec::new()).map_ok(|bytes| bytes.freeze())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -708,20 +832,4 @@ mod tests {
             .unwrap()
         )
     }
-}
-
-fn into_byte_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<u8>>
-where
-    R: AsyncRead,
-{
-    codec::FramedRead::new(r, codec::BytesCodec::new())
-        .map_ok(|bytes| stream::iter(bytes).map(Ok))
-        .try_flatten()
-}
-
-fn into_bytes_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<Bytes>>
-where
-    R: AsyncRead,
-{
-    codec::FramedRead::new(r, codec::BytesCodec::new()).map_ok(|bytes| bytes.freeze())
 }
