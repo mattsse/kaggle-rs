@@ -1,14 +1,12 @@
+use futures;
+use futures::{Future, Stream};
+use hyper;
+use hyper::header::UserAgent;
+use serde_json;
 use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-use futures;
-use futures::{Future, Stream};
-use hyper;
-use serde_json;
-
-use hyper::header::UserAgent;
 
 use super::{configuration, Error};
 

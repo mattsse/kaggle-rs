@@ -2,6 +2,10 @@ use hyper;
 use serde;
 use serde_json;
 
+use super::models::*;
+
+pub use self::kaggle_api::{KaggleApi, KaggleApiClient};
+
 #[derive(Debug)]
 pub enum Error<T> {
     Hyper(hyper::Error),
@@ -48,10 +52,6 @@ impl<T> From<serde_json::Error> for Error<T> {
     }
 }
 
-use super::models::*;
-
 mod kaggle_api;
-pub use self::kaggle_api::{KaggleApi, KaggleApiClient};
-
 pub mod client;
 pub mod configuration;
