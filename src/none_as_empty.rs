@@ -1,6 +1,6 @@
 use serde::{Serialize, Serializer};
 
-/// Serialize a string from `Option<T>` using `AsRef<str>` or using the empty
+/// Serialize a string from `Option<T>` using `Serialize` or using the empty
 /// string if `None`.
 pub fn serialize<T, S>(option: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
 where
