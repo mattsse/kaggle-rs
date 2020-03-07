@@ -1,4 +1,22 @@
-use crate::models::extended::{File, LeaderboardEntry, Submission};
+use std::convert::TryInto;
+use std::fmt;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::time::Duration;
+
+use bytes::Bytes;
+use futures::stream::{self, Stream, StreamExt, TryStreamExt};
+use reqwest::header::{self, HeaderMap, HeaderValue};
+use reqwest::{IntoUrl, StatusCode, Url};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use tokio::io::AsyncRead;
+use tokio_util::codec;
+
+use anyhow::{anyhow, Context};
+
+use crate::models::extended::{File, LeaderboardEntry, Submission, SubmitResult};
 use crate::models::{
     DatasetNewRequest,
     DatasetNewVersionRequest,
@@ -6,17 +24,6 @@ use crate::models::{
     KernelPushRequest,
 };
 use crate::request::CompetitionsList;
-use anyhow::{anyhow, Context};
-use reqwest::header::{self, HeaderMap};
-use reqwest::{IntoUrl, StatusCode, Url};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::fmt;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 /// Describes API errors
 #[derive(Debug)]
@@ -72,7 +79,7 @@ pub struct KaggleApiClientBuilder {
 
 impl KaggleApiClientBuilder {
     fn default_headers() -> HeaderMap {
-        let mut headers = HeaderMap::with_capacity(3);
+        let headers = HeaderMap::with_capacity(3);
         // TODO do i need this at all?
         headers
     }
@@ -127,13 +134,13 @@ impl KaggleApiClientBuilder {
         } else {
             headers.insert(
                 header::USER_AGENT,
-                header::HeaderValue::from_static("kaggele-rs/1/rust"),
+                HeaderValue::from_static("kaggele-rs/1/rust"),
             );
         }
         // TODO json default?
         headers.insert(
             header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/json"),
+            HeaderValue::from_static("application/json"),
         );
 
         let client = if let Some(client) = self.client {
@@ -222,6 +229,15 @@ pub enum Authentication {
 }
 
 impl Authentication {
+    pub fn with_credentials<S: ToString, T: ToString>(user_name: S, key: T) -> Self {
+        Authentication::Credentials {
+            user_name: user_name.to_string(),
+            key: key.to_string(),
+        }
+    }
+}
+
+impl Authentication {
     fn credentials(self) -> anyhow::Result<KaggleCredentials> {
         match self {
             Authentication::Env => KaggleCredentials::from_env(),
@@ -261,18 +277,19 @@ impl KaggleApiClient {
         if let Some(body) = body {
             req = req.body(body);
         }
-        Ok(Self::request(req).await?.json::<T>().await?)
+        Ok(Self::request_json(req).await?)
     }
 
     async fn get_json<T: DeserializeOwned, U: IntoUrl>(&self, url: U) -> anyhow::Result<T> {
-        Ok(Self::request(self.client.get(url))
-            .await?
-            .json::<T>()
-            .await?)
+        Ok(Self::request_json(self.client.get(url)).await?)
+    }
+
+    async fn request_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> anyhow::Result<T> {
+        Ok(Self::request(req).await?.json::<T>().await?)
     }
 
     /// Execute the request.
-    async fn request(mut req: reqwest::RequestBuilder) -> anyhow::Result<reqwest::Response> {
+    async fn request(req: reqwest::RequestBuilder) -> anyhow::Result<reqwest::Response> {
         let resp = req.send().await?;
 
         if resp.status().is_success() {
@@ -307,11 +324,11 @@ impl KaggleApiClient {
         let req = self
             .client
             .get(self.join_url("competitions/list")?)
-            .query(&[competition]);
+            .query(&competition);
         unimplemented!("Not implemented yet.")
     }
 
-    pub async fn competition_download_leaderboard(&self, id: &str) -> anyhow::Result<ApiResp> {
+    pub async fn competition_download_leaderboard(&self, _id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
@@ -329,14 +346,14 @@ impl KaggleApiClient {
     ///
     pub async fn competitions_data_download_file(
         &self,
-        id: &str,
-        file_name: &str,
+        _id: &str,
+        _file_name: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
     ///
-    pub async fn competitions_data_download_files(&self, id: &str) -> anyhow::Result<ApiResp> {
+    pub async fn competitions_data_download_files(&self, _id: &str) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
@@ -365,167 +382,295 @@ impl KaggleApiClient {
     ///
     pub async fn competitions_submissions_submit(
         &self,
-        blob_file_tokens: &str,
-        submission_description: &str,
-        id: &str,
+        _id: &str,
+        _blob_file_tokens: &str,
+        _submission_description: Option<String>,
+    ) -> anyhow::Result<SubmitResult> {
+        // last modified: Return the last modification time of a file,
+        // content_length: size of the file
+
+        // TODO call self.competitions_submissions_url
+        unimplemented!("Not implemented yet.")
+    }
+
+    /// Submit a competition
+    pub async fn competition_submit<S: AsRef<Path>, T: AsRef<str>>(
+        &self,
+        file: S,
+        competition: T,
+        message: Option<String>,
+    ) -> anyhow::Result<SubmitResult> {
+        let competition = competition.as_ref();
+        let file = file.as_ref();
+        let meta = file.metadata()?;
+        let content_length = meta.len();
+        let last_modified = meta
+            .modified()
+            .unwrap_or_else(|_| std::time::SystemTime::now())
+            .elapsed()?;
+
+        let file_name = file
+            .file_name()
+            .context("File path terminates in `..`")?
+            .to_str()
+            .context("File name is not valid unicode")?;
+
+        let url_result = self
+            .competitions_submissions_url(&competition, content_length, last_modified, file_name)
+            .await?;
+
+        let obj = url_result
+            .as_object()
+            .context("Expected json response object")?;
+
+        // Temporary hack, `isComplete` exists on the old DTO but not the new,
+        let upload_result = if obj.get("isComplete").is_some() {
+            // old submissions path
+            let url_list = obj
+                .get("createUrl")
+                .and_then(serde_json::Value::as_str)
+                .context("Missing `createUrl` field")?;
+            let parts: Vec<_> = url_list.split('/').rev().collect();
+            if parts.len() < 3 {
+                return Err(anyhow!(
+                    "createUrl response with incomplete segments {}",
+                    url_list
+                ));
+            }
+            self.competitions_submissions_upload(
+                file,
+                parts[0],
+                parts[1].parse()?,
+                Duration::from_secs(parts[2].parse()?),
+            )
+            .await?
+        } else {
+            self.upload_complete(
+                file,
+                obj.get("createUrl")
+                    .and_then(serde_json::Value::as_str)
+                    .context("Missing createUrl in response")?,
+            )
+            .await?
+        };
+
+        let token = upload_result
+            .as_object()
+            .and_then(|x| x.get("token"))
+            .and_then(serde_json::Value::as_str)
+            .context("Missing upload token")?;
+
+        Ok(self
+            .competitions_submissions_submit(competition.as_ref(), token, message)
+            .await?)
+    }
+
+    pub async fn upload_complete<T: AsRef<Path>, U: IntoUrl>(
+        &self,
+        file: T,
+        url: U,
+    ) -> anyhow::Result<serde_json::Value> {
+        let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
+
+        let req = self
+            .client
+            .put(url)
+            .body(reqwest::Body::wrap_stream(stream));
+
+        unimplemented!()
+    }
+
+    /// Upload competition submission file
+    pub async fn competitions_submissions_upload<T: AsRef<Path>>(
+        &self,
+        _file: T,
+        _guid: &str,
+        _content_length: u64,
+        _last_modified_date_utc: Duration,
+    ) -> anyhow::Result<serde_json::Value> {
+        unimplemented!("Not implemented yet.")
+    }
+
+    /// Generate competition submission URL
+    pub async fn competitions_submissions_url<S: AsRef<str>, T: ToString>(
+        &self,
+        id: S,
+        content_length: u64,
+        last_modified_date_utc: Duration,
+        file_name: T,
+    ) -> anyhow::Result<serde_json::Value> {
+        let form = reqwest::multipart::Form::new().text("fileName", file_name.to_string());
+
+        let req = self
+            .client
+            .post(self.join_url(format!(
+                "/competitions/{}/submissions/url/{}/{}",
+                id.as_ref(),
+                content_length,
+                last_modified_date_utc.as_secs()
+            ))?)
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("multipart/form-data"),
+            )
+            .multipart(form);
+        Ok(Self::request_json(req).await?)
+    }
+
+    pub async fn datasets_create_new(
+        &self,
+        _dataset_req: DatasetNewRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
     ///
-    pub async fn competitions_submissions_upload(
-        &self,
-        file: File,
-        guid: &str,
-        content_length: i32,
-        last_modified_date_utc: i32,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
-    }
-    pub async fn competitions_submissions_url(
-        &self,
-        id: &str,
-        content_length: i32,
-        last_modified_date_utc: i32,
-        file_name: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
-    }
-    pub async fn datasets_create_new(
-        &self,
-        dataset_new_request: DatasetNewRequest,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
-    }
     pub async fn datasets_create_version(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
-        dataset_new_version_request: DatasetNewVersionRequest,
+        _owner_slug: &str,
+        _dataset_slug: &str,
+        _dataset_new_version_request: DatasetNewVersionRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_create_version_by_id(
         &self,
-        id: i32,
-        dataset_new_version_request: DatasetNewVersionRequest,
+        _id: i32,
+        _dataset_req: DatasetNewVersionRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_download(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
-        dataset_version_number: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
+        _dataset_version_number: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_download_file(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
-        file_name: &str,
-        dataset_version_number: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
+        _file_name: &str,
+        _dataset_version_number: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_list(
         &self,
-        group: &str,
-        sort_by: &str,
-        size: &str,
-        filetype: &str,
-        license: &str,
-        tagids: &str,
-        search: &str,
-        user: &str,
-        page: usize,
-        max_size: i64,
-        min_size: i64,
+        _group: &str,
+        _sort_by: &str,
+        _size: &str,
+        _filetype: &str,
+        _license: &str,
+        _tagids: &str,
+        _search: &str,
+        _user: &str,
+        _page: usize,
+        _max_size: i64,
+        _min_size: i64,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_list_files(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn datasets_status(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_upload_file(
         &self,
-        file_name: &str,
-        content_length: i32,
-        last_modified_date_utc: i32,
+        _file_name: &str,
+        _content_length: i32,
+        _last_modified_date_utc: i32,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn datasets_view(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn kernel_output(
         &self,
-        user_name: &str,
-        kernel_slug: &str,
+        _user_name: &str,
+        _kernel_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
-    pub async fn kernel_pull(&self, user_name: &str, kernel_slug: &str) -> anyhow::Result<ApiResp> {
+
+    pub async fn kernel_pull(
+        &self,
+        _user_name: &str,
+        _kernel_slug: &str,
+    ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
     pub async fn kernel_push(
         &self,
-        kernel_push_request: KernelPushRequest,
+        _kernel_push_request: KernelPushRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn kernel_status(
         &self,
-        user_name: &str,
-        kernel_slug: &str,
+        _user_name: &str,
+        _kernel_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn kernels_list(
         &self,
-        page: usize,
-        page_size: i32,
-        search: &str,
-        group: &str,
-        user: &str,
-        language: &str,
-        kernel_type: &str,
-        output_type: &str,
-        sort_by: &str,
-        dataset: &str,
-        competition: &str,
-        parent_kernel: &str,
+        _page: usize,
+        _page_size: i32,
+        _search: &str,
+        _group: &str,
+        _user: &str,
+        _language: &str,
+        _kernel_type: &str,
+        _output_type: &str,
+        _sort_by: &str,
+        _dataset: &str,
+        _competition: &str,
+        _parent_kernel: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn metadata_get(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
+        _owner_slug: &str,
+        _dataset_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
+
     pub async fn metadata_post(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
-        settings: DatasetUpdateSettingsRequest,
+        _owner_slug: &str,
+        _dataset_slug: &str,
+        _settings: DatasetUpdateSettingsRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
@@ -535,8 +680,48 @@ impl KaggleApiClient {
 mod tests {
     use super::*;
 
+    fn kaggle() -> KaggleApiClient {
+        KaggleApiClient::builder()
+            .auth(Authentication::with_credentials("name", "key"))
+            .build()
+            .unwrap()
+    }
+
     #[test]
     fn competition_query() {
-        // let client = KaggleApiClient::builder().build().unwrap()
+        let kaggle = kaggle();
+
+        let req = kaggle
+            .client
+            .get(kaggle.join_url("competitions/list").unwrap())
+            .query(&CompetitionsList::default())
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            *req.url(),
+            format!(
+                "{}?group=&category=&sortBy=&page=1&search=",
+                kaggle.join_url("competitions/list").unwrap()
+            )
+            .parse()
+            .unwrap()
+        )
     }
+}
+
+fn into_byte_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<u8>>
+where
+    R: AsyncRead,
+{
+    codec::FramedRead::new(r, codec::BytesCodec::new())
+        .map_ok(|bytes| stream::iter(bytes).map(Ok))
+        .try_flatten()
+}
+
+fn into_bytes_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<Bytes>>
+where
+    R: AsyncRead,
+{
+    codec::FramedRead::new(r, codec::BytesCodec::new()).map_ok(|bytes| bytes.freeze())
 }

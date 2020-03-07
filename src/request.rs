@@ -1,7 +1,9 @@
-use crate::query::{CompetitionCategory, CompetitionGroup, CompetitionSortBy};
 use serde::{Deserialize, Serialize, Serializer};
 
+use crate::query::{CompetitionCategory, CompetitionGroup, CompetitionSortBy};
+
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompetitionsList {
     /// Group to filter result to
     #[serde(with = "crate::none_as_empty")]
@@ -22,9 +24,11 @@ pub struct CompetitionsList {
 impl CompetitionsList {
     pub fn new(page: usize) -> Self {
         Self {
+            group: None,
+            category: None,
+            sort_by: None,
             page,
             search: None,
-            ..Default::default()
         }
     }
 }
