@@ -19,4 +19,5 @@ mod error;
 pub mod extended;
 mod kernel_push_request;
 mod license;
+pub mod metadata;
 mod result;
