@@ -16,7 +16,9 @@ use tokio_util::codec;
 
 use anyhow::{anyhow, Context};
 
+use crate::error::KaggleError;
 use crate::models::extended::{File, LeaderboardEntry, Submission, SubmitResult};
+use crate::models::metadata::Metadata;
 use crate::models::{
     DatasetNewRequest,
     DatasetNewVersionRequest,
@@ -61,6 +63,12 @@ pub struct KaggleApiClient {
 
 impl KaggleApiClient {
     const HEADER_API_VERSION: &'static str = "X-Kaggle-ApiVersion";
+
+    const DATASET_METADATA_FILE: &'static str = "dataset-metadata.json";
+
+    const OLD_DATASET_METADATA_FILE: &'static str = "datapackage.json";
+
+    const KERNEL_METADATA_FILE: &'static str = "kernel-metadata.json";
 
     /// Convenience method to create a [`KaggleApiClientBuilder`]
     #[inline]
@@ -153,11 +161,6 @@ impl KaggleApiClientBuilder {
                 )),
             );
         }
-        // TODO json default?
-        headers.insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
 
         let client = if let Some(client) = self.client {
             client
@@ -288,6 +291,11 @@ impl Default for Authentication {
 pub struct ApiResp;
 
 impl KaggleApiClient {
+    #[inline]
+    fn join_url<T: AsRef<str>>(&self, path: T) -> anyhow::Result<Url> {
+        Ok(self.base_url.join(path.as_ref())?)
+    }
+
     async fn get<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
         Ok(Self::request(self.client.get(url)).await?.text().await?)
     }
@@ -334,10 +342,6 @@ impl KaggleApiClient {
         }
     }
 
-    fn join_url<T: AsRef<str>>(&self, path: T) -> anyhow::Result<Url> {
-        Ok(self.base_url.join(path.as_ref())?)
-    }
-
     /// Write the request's response to the provided output destination.
     async fn download_file(
         mut req: reqwest::RequestBuilder,
@@ -353,6 +357,31 @@ impl KaggleApiClient {
         }
         Ok(output.to_path_buf())
     }
+
+    fn get_dataset_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
+        let path = path.as_ref().to_path_buf();
+        if path.is_dir() {
+            let file = path.join(Self::DATASET_METADATA_FILE);
+            if !file.exists() {
+                let old = path.join(Self::OLD_DATASET_METADATA_FILE);
+                if old.exists() {
+                    Ok(old)
+                } else {
+                    Err(KaggleError::FileNotFound(file))?
+                }
+            } else {
+                Ok(file)
+            }
+        } else {
+            if path.exists() {
+                Ok(path)
+            } else {
+                Err(KaggleError::FileNotFound(path))?
+            }
+        }
+    }
+
+    pub async fn upload_files(&self, req: reqwest::RequestBuilder) {}
 }
 
 impl KaggleApiClient {
@@ -623,6 +652,89 @@ impl KaggleApiClient {
             ))?)
             .multipart(form);
         Ok(Self::request_json(req).await?)
+    }
+
+    /// Create a new dataset, meaning the same as creating a version but with
+    /// extra metadata like license and user/owner.
+    pub async fn dataset_create_new(
+        &self,
+        folder: impl AsRef<Path>,
+        public: bool,
+        convert_to_csv: bool,
+    ) -> anyhow::Result<ApiResp> {
+        let folder = folder.as_ref();
+        let meta_file = Self::get_dataset_metadata_file(folder)?;
+        let file = tokio::fs::read(&meta_file).await?;
+
+        let meta_data: Metadata = serde_json::from_slice(&file)?;
+
+        let owner_slug = meta_data
+            .owner_slug()
+            .ok_or_else(|| KaggleError::Metadata {
+                msg: "Missing owner slug in id".to_string(),
+            })?
+            .to_string();
+
+        let dataset_slug = meta_data
+            .dataset_slug()
+            .ok_or_else(|| KaggleError::Metadata {
+                msg: "Missing dataset slug in id".to_string(),
+            })?
+            .to_string();
+
+        // validate
+        if dataset_slug == "INSERT_SLUG_HERE" {
+            Err(KaggleError::Metadata {
+                msg: "Default slug detected, please change values before uploading".to_string(),
+            })?
+        }
+        if meta_data.title == "INSERT_SLUG_HERE" {
+            Err(KaggleError::Metadata {
+                msg: "Default title detected, please change values before uploading".to_string(),
+            })?
+        }
+        if meta_data.licenses.len() != 1 {
+            Err(KaggleError::Metadata {
+                msg: "Please specify exactly one license".to_string(),
+            })?
+        }
+        if dataset_slug.len() < 6 || dataset_slug.len() > 50 {
+            Err(KaggleError::Metadata {
+                msg: "The dataset slug must be between 6 and 50 characters".to_string(),
+            })?
+        }
+        if meta_data.title.len() < 6 || meta_data.title.len() > 50 {
+            Err(KaggleError::Metadata {
+                msg: "The dataset title must be between 6 and 50 characters".to_string(),
+            })?
+        }
+        let _ = meta_data.validate_resource(folder)?;
+
+        let mut request = DatasetNewRequest::builder(meta_data.title);
+        if let Some(subtitle) = &meta_data.subtitle {
+            if subtitle.len() < 20 || subtitle.len() > 80 {
+                Err(KaggleError::Metadata {
+                    msg: "Subtitle length must be between 20 and 80 characters".to_string(),
+                })?
+            }
+            request = request.subtitle(subtitle);
+        }
+
+        let request = request
+            .slug(dataset_slug)
+            .owner_slug(owner_slug)
+            .license_name(meta_data.licenses[0].to_string())
+            .description(meta_data.description)
+            .private(!public)
+            .convert_to_csv(convert_to_csv)
+            .category_ids(meta_data.keywords)
+            .build();
+
+        // steps: 1. upload files -> get token
+        // 2. add token to DatasetUploadFile
+        // 3. upload
+
+        unimplemented!("Not implemented yet.")
     }
 
     pub async fn datasets_create_new(
