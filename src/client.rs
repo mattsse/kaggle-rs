@@ -11,7 +11,7 @@ use reqwest::header::{self, HeaderMap, HeaderValue};
 use reqwest::{multipart, IntoUrl, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio_util::codec;
 
 use anyhow::{anyhow, Context};
@@ -344,7 +344,7 @@ impl KaggleApiClient {
 
     /// Write the request's response to the provided output destination.
     async fn download_file(
-        mut req: reqwest::RequestBuilder,
+        req: reqwest::RequestBuilder,
         output: impl AsRef<Path>,
     ) -> anyhow::Result<PathBuf> {
         let mut res = req.send().await?;
@@ -381,7 +381,7 @@ impl KaggleApiClient {
         }
     }
 
-    pub async fn upload_files(&self, req: reqwest::RequestBuilder) {}
+    pub async fn upload_files(&self, _req: reqwest::RequestBuilder) {}
 }
 
 impl KaggleApiClient {
@@ -720,7 +720,7 @@ impl KaggleApiClient {
             request = request.subtitle(subtitle);
         }
 
-        let request = request
+        let _request = request
             .slug(dataset_slug)
             .owner_slug(owner_slug)
             .license_name(meta_data.licenses[0].to_string())
@@ -739,7 +739,7 @@ impl KaggleApiClient {
 
     pub async fn datasets_create_new(
         &self,
-        dataset_req: DatasetNewRequest,
+        _dataset_req: DatasetNewRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
