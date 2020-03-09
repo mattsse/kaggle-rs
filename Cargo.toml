@@ -28,4 +28,5 @@ tokio-util = { version = "0.3", features = ["codec"] }
 bytes = "0.5"
 zip = "0.5"
 thiserror = "1.0"
-tar = "0.4.26"
+tar = "0.4"
+walkdir = "2.3"
