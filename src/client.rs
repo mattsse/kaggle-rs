@@ -13,19 +13,24 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio_util::codec;
+use walkdir::WalkDir;
 
 use anyhow::{anyhow, Context};
 
 use crate::error::KaggleError;
-use crate::models::extended::{File, LeaderboardEntry, Submission, SubmitResult};
-use crate::models::metadata::Metadata;
+use crate::models::extended::{File, FileUploadInfo, LeaderboardEntry, Submission, SubmitResult};
+use crate::models::metadata::{Metadata, Resource};
 use crate::models::{
     DatasetNewRequest,
     DatasetNewVersionRequest,
     DatasetUpdateSettingsRequest,
+    DatasetUploadFile,
     KernelPushRequest,
 };
 use crate::request::CompetitionsList;
+use std::collections::HashMap;
+use std::ops::Deref;
+use tempdir::TempDir;
 
 /// Describes API errors
 #[derive(Debug)]
@@ -381,7 +386,90 @@ impl KaggleApiClient {
         }
     }
 
-    pub async fn upload_files(&self, _req: reqwest::RequestBuilder) {}
+    fn get_file_metadata(file: impl AsRef<Path>) -> anyhow::Result<(u64, Duration)> {
+        let file = file.as_ref();
+        let meta = file.metadata()?;
+        let content_length = meta.len();
+        let last_modified = meta
+            .modified()
+            .unwrap_or_else(|_| std::time::SystemTime::now())
+            .elapsed()?;
+
+        Ok((content_length, last_modified))
+    }
+
+    /// Upload a single file.
+    async fn upload_file(
+        &self,
+        file: impl AsRef<Path>,
+        file_name: impl AsRef<str>,
+        item: Option<&Resource>,
+    ) -> anyhow::Result<DatasetUploadFile> {
+        let (content_length, last_modified) = Self::get_file_metadata(file)?;
+        let info = self
+            .datasets_upload_file(file_name.as_ref(), content_length, last_modified)
+            .await?;
+        let mut upload_file = DatasetUploadFile::new(info.token);
+        if let Some(item) = item {
+            upload_file.set_description(item.description.clone());
+            if let Some(schema) = &item.schema {
+                upload_file.set_columns(schema.get_processed_columns());
+            }
+        }
+        Ok(upload_file)
+    }
+
+    /// Upload files in a folder.
+    async fn upload_files(
+        &self,
+        folder: impl AsRef<Path>,
+        resources: &[Resource],
+        archive_mode: ArchiveMode,
+    ) -> anyhow::Result<Vec<DatasetUploadFile>> {
+        let mut uploads = Vec::with_capacity(resources.len());
+
+        let resource_paths: HashMap<_, _> =
+            resources.iter().map(|x| (x.path.as_str(), x)).collect();
+
+        let mut tmp = None;
+
+        for entry in WalkDir::new(folder)
+            .min_depth(1)
+            .max_depth(1)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let file_name = entry
+                .path()
+                .file_name()
+                .context("File path terminates in `..`")?
+                .to_str()
+                .context("File name is not valid unicode")?;
+
+            if entry.path().is_file() {
+                let upload_file = self
+                    .upload_file(
+                        entry.path(),
+                        file_name,
+                        resource_paths.get(file_name).map(Deref::deref),
+                    )
+                    .await?;
+                uploads.push(upload_file);
+            } else if entry.path().is_dir() {
+                // TODO switch to self.download_dir or a tmp dir that is owned by the client
+                // preventing dropping/deleting
+                if tmp.is_none() {
+                    tmp = Some(TempDir::new("kaggle-upload")?);
+                }
+                // tmp.close()?
+
+                // TODO 1. archive archive_mode.make_archive
+                // 2. self.upload_file
+            }
+        }
+
+        Ok(uploads)
+    }
 }
 
 impl KaggleApiClient {
@@ -525,12 +613,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<SubmitResult> {
         let competition = competition.as_ref();
         let file = file.as_ref();
-        let meta = file.metadata()?;
-        let content_length = meta.len();
-        let last_modified = meta
-            .modified()
-            .unwrap_or_else(|_| std::time::SystemTime::now())
-            .elapsed()?;
+        let (content_length, last_modified) = Self::get_file_metadata(&file)?;
 
         let file_name = file
             .file_name()
@@ -656,11 +739,13 @@ impl KaggleApiClient {
 
     /// Create a new dataset, meaning the same as creating a version but with
     /// extra metadata like license and user/owner.
+    // TODO convert parameters to struct
     pub async fn dataset_create_new(
         &self,
         folder: impl AsRef<Path>,
         public: bool,
         convert_to_csv: bool,
+        archive_mode: ArchiveMode,
     ) -> anyhow::Result<ApiResp> {
         let folder = folder.as_ref();
         let meta_file = Self::get_dataset_metadata_file(folder)?;
@@ -720,15 +805,19 @@ impl KaggleApiClient {
             request = request.subtitle(subtitle);
         }
 
-        let _request = request
-            .slug(dataset_slug)
-            .owner_slug(owner_slug)
-            .license_name(meta_data.licenses[0].to_string())
-            .description(meta_data.description)
-            .private(!public)
-            .convert_to_csv(convert_to_csv)
-            .category_ids(meta_data.keywords)
-            .build();
+        let datasets = self
+            .upload_files(folder, &meta_data.resources, archive_mode)
+            .await?;
+
+        // let _request = request
+        //     .slug(dataset_slug)
+        //     .owner_slug(owner_slug)
+        //     .license_name(meta_data.licenses[0].to_string())
+        //     .description(meta_data.description)
+        //     .private(!public)
+        //     .convert_to_csv(convert_to_csv)
+        //     .category_ids(meta_data.keywords)
+        //     .build();
 
         // steps: 1. upload files -> get token
         // 2. add token to DatasetUploadFile
@@ -813,13 +902,25 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
+    /// Get URL and token to start uploading a data file.
     pub async fn datasets_upload_file(
         &self,
-        _file_name: &str,
-        _content_length: i32,
-        _last_modified_date_utc: i32,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        file_name: impl ToString,
+        content_length: u64,
+        last_modified_date_utc: Duration,
+    ) -> anyhow::Result<FileUploadInfo> {
+        let form = multipart::Form::new().text("fileName", file_name.to_string());
+
+        Ok(Self::request_json(
+            self.client
+                .post(self.join_url(format!(
+                    "/datasets/upload/file/{}/{}",
+                    content_length,
+                    last_modified_date_utc.as_secs()
+                ))?)
+                .multipart(form),
+        )
+        .await?)
     }
 
     pub async fn datasets_view(
@@ -893,6 +994,21 @@ impl KaggleApiClient {
         _settings: DatasetUpdateSettingsRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ArchiveMode {
+    Tar,
+    Zip,
+}
+
+impl ArchiveMode {
+    pub fn make_archive(&self, from: impl AsRef<Path>, to: impl AsRef<Path>) {
+        match self {
+            ArchiveMode::Tar => {}
+            ArchiveMode::Zip => {}
+        }
     }
 }
 
