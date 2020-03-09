@@ -1,5 +1,5 @@
 use crate::error::KaggleError;
-use crate::models::License;
+use crate::models::{DatasetColumn, License};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -58,6 +58,13 @@ pub struct Resource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     pub fields: Vec<Field>,
+}
+
+impl Schema {
+    /// Process a column, check for the type, and return the processed column.
+    pub fn get_processed_columns(&self) -> Vec<DatasetColumn> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

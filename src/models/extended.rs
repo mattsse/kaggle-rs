@@ -28,7 +28,9 @@ pub struct File {}
 pub struct Tag {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileUploadInfo {}
+pub struct FileUploadInfo {
+    pub token: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatasetNewVersionResponse {}

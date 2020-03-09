@@ -8,7 +8,7 @@ use crate::models::DatasetColumn;
 pub struct DatasetUploadFile {
     /// A token referencing a specific file upload that can be used across
     /// requests
-    token: Option<String>,
+    token: String,
     /// The file description
     description: Option<String>,
     /// A list of dataset column metadata
@@ -16,21 +16,21 @@ pub struct DatasetUploadFile {
 }
 
 impl DatasetUploadFile {
-    pub fn set_token(&mut self, token: String) {
-        self.token = Some(token);
+    pub fn new(token: impl ToString) -> Self {
+        Self {
+            token: token.to_string(),
+            description: None,
+            columns: None,
+        }
     }
 
     pub fn with_token(mut self, token: String) -> DatasetUploadFile {
-        self.token = Some(token);
+        self.token = token;
         self
     }
 
-    pub fn token(&self) -> Option<&String> {
-        self.token.as_ref()
-    }
-
-    pub fn reset_token(&mut self) {
-        self.token = None;
+    pub fn token(&self) -> &str {
+        &self.token
     }
 
     pub fn set_description(&mut self, description: String) {
