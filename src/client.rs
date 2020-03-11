@@ -18,7 +18,17 @@ use walkdir::WalkDir;
 use anyhow::{anyhow, Context};
 
 use crate::error::KaggleError;
-use crate::models::extended::{File, FileUploadInfo, LeaderboardEntry, Submission, SubmitResult};
+use crate::models::extended::{
+    Competition,
+    DatasetNewResponse,
+    File,
+    FileUploadInfo,
+    Kernel,
+    LeaderboardEntry,
+    ListFilesResult,
+    Submission,
+    SubmitResult,
+};
 use crate::models::metadata::{Metadata, Resource};
 use crate::models::{
     DatasetNewRequest,
@@ -27,7 +37,7 @@ use crate::models::{
     DatasetUploadFile,
     KernelPushRequest,
 };
-use crate::request::CompetitionsList;
+use crate::request::{CompetitionsList, KernelsList};
 use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
@@ -180,7 +190,7 @@ impl KaggleApiClientBuilder {
         let download_dir = if let Some(path) = self.download_dir {
             path
         } else {
-            tempdir::TempDir::new("kaggle-rs")?.into_path()
+            std::env::current_dir()?
         };
 
         Ok(KaggleApiClient {
@@ -305,14 +315,17 @@ impl KaggleApiClient {
         Ok(Self::request(self.client.get(url)).await?.text().await?)
     }
 
-    async fn post_json<T: DeserializeOwned, U: IntoUrl, B: Into<reqwest::Body>>(
+    async fn post_json<T: DeserializeOwned, U: IntoUrl, B: Serialize + ?Sized>(
         &self,
         url: U,
-        body: Option<B>,
+        body: Option<&B>,
     ) -> anyhow::Result<T> {
-        let mut req = self.client.post(url);
+        let mut req = self.client.post(url).header(
+            header::ACCEPT,
+            header::HeaderValue::from_static("application/json"),
+        );
         if let Some(body) = body {
-            req = req.body(body);
+            req = req.json(body);
         }
         Ok(Self::request_json(req).await?)
     }
@@ -361,6 +374,12 @@ impl KaggleApiClient {
             file.write_all(&chunk).await?;
         }
         Ok(output.to_path_buf())
+    }
+
+    async fn read_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Metadata> {
+        let meta_file = Self::get_dataset_metadata_file(path)?;
+        let file = tokio::fs::read(&meta_file).await?;
+        Ok(serde_json::from_slice(&file)?)
     }
 
     fn get_dataset_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
@@ -499,16 +518,14 @@ impl KaggleApiClient {
 
 impl KaggleApiClient {
     /// Returns a list of `Competition'  instances.
-    ///
-    /// `Vec<Competition>`
     pub async fn competitions_list(
         &self,
-        competition: CompetitionsList,
-    ) -> anyhow::Result<serde_json::Value> {
+        competition: &CompetitionsList,
+    ) -> anyhow::Result<Vec<Competition>> {
         Ok(Self::request_json(
             self.client
                 .get(self.join_url("competitions/list")?)
-                .query(&competition),
+                .query(competition),
         )
         .await?)
     }
@@ -768,17 +785,15 @@ impl KaggleApiClient {
     pub async fn dataset_create_new(
         &self,
         folder: impl AsRef<Path>,
-        _public: bool,
-        _convert_to_csv: bool,
+        public: bool,
+        convert_to_csv: bool,
         archive_mode: ArchiveMode,
-    ) -> anyhow::Result<ApiResp> {
+    ) -> anyhow::Result<DatasetNewResponse> {
         let folder = folder.as_ref();
-        let meta_file = Self::get_dataset_metadata_file(folder)?;
-        let file = tokio::fs::read(&meta_file).await?;
 
-        let meta_data: Metadata = serde_json::from_slice(&file)?;
+        let meta_data: Metadata = Self::read_metadata_file(folder).await?;
 
-        let _owner_slug = meta_data
+        let owner_slug = meta_data
             .owner_slug()
             .ok_or_else(|| KaggleError::Metadata {
                 msg: "Missing owner slug in id".to_string(),
@@ -830,40 +845,64 @@ impl KaggleApiClient {
             request = request.subtitle(subtitle);
         }
 
-        let _datasets = self
+        let files = self
             .upload_files(folder, &meta_data.resources, archive_mode)
             .await?;
 
-        // let _request = request
-        //     .slug(dataset_slug)
-        //     .owner_slug(owner_slug)
-        //     .license_name(meta_data.licenses[0].to_string())
-        //     .description(meta_data.description)
-        //     .private(!public)
-        //     .convert_to_csv(convert_to_csv)
-        //     .category_ids(meta_data.keywords)
-        //     .build();
+        let request = request
+            .slug(dataset_slug)
+            .owner_slug(owner_slug)
+            .license_name(meta_data.licenses[0].to_string())
+            .description(meta_data.description)
+            .private(!public)
+            .convert_to_csv(convert_to_csv)
+            .category_ids(meta_data.keywords)
+            .files(files)
+            .build();
 
-        // steps: 1. upload files -> get token
-        // 2. add token to DatasetUploadFile
-        // 3. upload
-
-        unimplemented!("Not implemented yet.")
+        Ok(self.datasets_create_new(request).await?)
     }
 
+    /// Create a new dataset.
     pub async fn datasets_create_new(
         &self,
-        _dataset_req: DatasetNewRequest,
+        new_dataset: DatasetNewRequest,
+    ) -> anyhow::Result<DatasetNewResponse> {
+        Ok(self
+            .post_json("/datasets/create/new", Some(&new_dataset))
+            .await?)
+    }
+
+    /// Create a new dataset version
+    pub async fn dataset_create_version(
+        &self,
+        folder: impl AsRef<Path>,
+        version_notes: impl ToString,
     ) -> anyhow::Result<ApiResp> {
+        let folder = folder.as_ref();
+        let meta_data = Self::read_metadata_file(folder).await?;
+        let _ = meta_data.validate_resource(folder)?;
+
+        let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
+
+        if let Some(subtitle) = meta_data.subtitle {
+            if subtitle.len() < 20 || subtitle.len() > 80 {
+                Err(KaggleError::Metadata {
+                    msg: "Subtitle length must be between 20 and 80 characters".to_string(),
+                })?
+            }
+            req.set_subtitle(subtitle);
+        }
+
         unimplemented!("Not implemented yet.")
     }
 
-    ///
+    /// Create a new dataset version
     pub async fn datasets_create_version(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-        _dataset_new_version_request: DatasetNewVersionRequest,
+        owner_slug: &str,
+        dataset_slug: &str,
+        dataset_new_version_request: DatasetNewVersionRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
@@ -912,13 +951,20 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
+    /// List dataset files
     pub async fn datasets_list_files(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+    ) -> anyhow::Result<ListFilesResult> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url(format!(" /datasets/list/{}/{}", owner_slug, dataset_slug))?),
+        )
+        .await?)
     }
+
     pub async fn datasets_status(
         &self,
         _owner_slug: &str,
@@ -964,13 +1010,34 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
+    /// Pull the latest code from a kernel
     pub async fn kernel_pull(
         &self,
-        _user_name: &str,
-        _kernel_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        user_name: Option<&str>,
+        kernel_slug: &str,
+    ) -> anyhow::Result<serde_json::Value> {
+        let user_name = user_name.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(Self::request_json(self.client.get(self.join_url(format!(
+            "/kernels/pull?userName={}&kernelSlug={}",
+            user_name, kernel_slug
+        ))?))
+        .await?)
     }
+
+    /// Pull a kernel, including a metadata file (if metadata is True) and
+    /// associated files to a specified path.
+    pub async fn kernel_pull_write(
+        &self,
+        user_name: Option<&str>,
+        kernel_slug: &str,
+        with_metadata: bool,
+        output: impl AsRef<Path>,
+    ) -> anyhow::Result<ApiResp> {
+        unimplemented!()
+    }
+
+    /// Push a new kernel version. Can be used to create a new kernel and update
+    /// an existing one.
     pub async fn kernel_push(
         &self,
         _kernel_push_request: KernelPushRequest,
@@ -978,38 +1045,42 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
+    /// Get the status of a kernel.
     pub async fn kernel_status(
         &self,
-        _user_name: &str,
-        _kernel_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        user_name: Option<&str>,
+        kernel_slug: &str,
+    ) -> anyhow::Result<serde_json::Value> {
+        let user_name = user_name.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(Self::request_json(self.client.get(self.join_url(format!(
+            "/kernels/status?userName={}&kernelSlug={}",
+            user_name, kernel_slug
+        ))?))
+        .await?)
     }
 
-    pub async fn kernels_list(
-        &self,
-        _page: usize,
-        _page_size: i32,
-        _search: &str,
-        _group: &str,
-        _user: &str,
-        _language: &str,
-        _kernel_type: &str,
-        _output_type: &str,
-        _sort_by: &str,
-        _dataset: &str,
-        _competition: &str,
-        _parent_kernel: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+    /// List kernels based on a set of search criteria.
+    pub async fn kernels_list(&self, kernel_list: &KernelsList) -> anyhow::Result<Vec<Kernel>> {
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url("/kernels/list")?)
+                .query(kernel_list),
+        )
+        .await?)
     }
 
+    /// Get the metadata for a dataset
     pub async fn metadata_get(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+    ) -> anyhow::Result<Metadata> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(Self::request_json(self.client.get(self.join_url(format!(
+            " /datasets/metadata/{}/{}",
+            owner_slug, dataset_slug
+        ))?))
+        .await?)
     }
 
     pub async fn metadata_post(
@@ -1036,12 +1107,19 @@ impl ArchiveMode {
         _src: impl AsRef<Path>,
         _to: impl AsRef<Path>,
     ) -> anyhow::Result<Option<PathBuf>> {
+        // TODO implement
         match self {
             ArchiveMode::Tar => {}
             ArchiveMode::Zip => {}
             ArchiveMode::Skip => {}
         }
         Ok(None)
+    }
+}
+
+impl Default for ArchiveMode {
+    fn default() -> Self {
+        ArchiveMode::Skip
     }
 }
 
