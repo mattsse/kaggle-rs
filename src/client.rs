@@ -398,20 +398,6 @@ impl KaggleApiClient {
         Ok((content_length, last_modified))
     }
 
-    async fn upload_file(
-        &self,
-        file: impl AsRef<Path>,
-        url: impl IntoUrl,
-    ) -> anyhow::Result<reqwest::Response> {
-        let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
-        Ok(Self::request(
-            self.client
-                .post(url)
-                .body(reqwest::Body::wrap_stream(stream)),
-        )
-        .await?)
-    }
-
     /// Upload a single dataset file.
     async fn upload_dataset_file(
         &self,
@@ -427,7 +413,7 @@ impl KaggleApiClient {
             .await?;
 
         // complete the upload to retrieve a path from the url parameter
-        let _ = self.upload_file(file, &info.create_url).await?;
+        let _ = self.upload_complete(file, &info.create_url).await?;
 
         let mut upload_file = DatasetUploadFile::new(info.token);
         if let Some(item) = item {
@@ -582,7 +568,7 @@ impl KaggleApiClient {
     }
 
     /// Downloads all competition files
-    pub async fn competitions_data_download_files<T: AsRef<Path>>(
+    pub async fn competitions_data_download_all_files<T: AsRef<Path>>(
         &self,
         id: &str,
         target: Option<T>,
@@ -715,11 +701,10 @@ impl KaggleApiClient {
         &self,
         file: impl AsRef<Path>,
         url: impl IntoUrl,
-    ) -> anyhow::Result<serde_json::Value> {
+    ) -> anyhow::Result<reqwest::Response> {
         let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
 
-        // TODO json? or reqwest::response?
-        Ok(Self::request_json(
+        Ok(Self::request(
             self.client
                 .put(url)
                 .body(reqwest::Body::wrap_stream(stream)),
