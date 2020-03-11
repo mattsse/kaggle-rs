@@ -7,6 +7,26 @@ pub enum PushKernelType {
     Notebook,
 }
 
+impl PushKernelType {
+    pub fn file_extension(&self, language: &Language) -> Option<&'static str> {
+        match self {
+            PushKernelType::Script => match language {
+                Language::Python => Some(".py"),
+                Language::R => Some(".r"),
+                Language::Sqlite => Some(".sqlite"),
+                Language::Julia => Some(".jl"),
+                _ => None,
+            },
+            PushKernelType::Notebook => match language {
+                Language::Python => Some(".ipynb"),
+                Language::R => Some(".irnb"),
+                Language::Julia => Some(".ijlnb"),
+                _ => None,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PushLanguageType {
@@ -171,4 +191,17 @@ pub enum DatasetSortBy {
     Updated,
     Active,
     Published,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Group {
+    Everyone,
+    Profile,
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Group::Everyone
+    }
 }

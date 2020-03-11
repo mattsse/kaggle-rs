@@ -4,6 +4,7 @@ use crate::query::{
     CompetitionCategory,
     CompetitionGroup,
     CompetitionSortBy,
+    Group,
     KernelType,
     Language,
     OutputType,
@@ -55,25 +56,30 @@ pub struct KernelsList {
     /// Results per page, defaults to 20
     pub page_size: usize,
     /// Filter to this dataset
+    #[serde(with = "crate::none_as_empty")]
     pub dataset: Option<String>,
     /// Filter to this competition
+    #[serde(with = "crate::none_as_empty")]
     pub competition: Option<String>,
     /// Filter to those with specified parent
+    #[serde(with = "crate::none_as_empty")]
     pub parent_kernel: Option<String>,
     /// A custom search string to pass to the list query
+    #[serde(with = "crate::none_as_empty")]
     pub search: Option<String>,
-    /// if true, group is specified as "my" to return personal kernels
-    pub mine: bool,
+    /// whit kind of kernels to return
+    pub group: Group,
     /// Filter results to a specific user
+    #[serde(with = "crate::none_as_empty")]
     pub user: Option<String>,
     /// The programming language of the kernel
-    pub language: Option<Language>,
+    pub language: Language,
     /// The type of kernel
-    pub kernel_type: Option<KernelType>,
+    pub kernel_type: KernelType,
     /// The output type
-    pub output_type: Option<OutputType>,
+    pub output_type: OutputType,
     /// Sort results by this string
-    pub sort_by: Option<SortBy>,
+    pub sort_by: SortBy,
 }
 
 impl Default for KernelsList {
@@ -95,12 +101,12 @@ impl KernelsList {
             competition: None,
             parent_kernel: None,
             search: None,
-            mine: false,
+            group: Default::default(),
             user: None,
-            language: None,
-            kernel_type: None,
-            output_type: None,
-            sort_by: None,
+            language: Default::default(),
+            kernel_type: Default::default(),
+            output_type: Default::default(),
+            sort_by: Default::default(),
         }
     }
 
@@ -109,8 +115,8 @@ impl KernelsList {
         self
     }
 
-    pub fn mine(mut self, mine: bool) -> Self {
-        self.mine = mine;
+    pub fn mine(mut self, group: Group) -> Self {
+        self.group = group;
         self
     }
 
@@ -140,22 +146,22 @@ impl KernelsList {
     }
 
     pub fn language(mut self, language: Language) -> Self {
-        self.language = Some(language);
+        self.language = language;
         self
     }
 
     pub fn kernel_type(mut self, kernel_type: KernelType) -> Self {
-        self.kernel_type = Some(kernel_type);
+        self.kernel_type = kernel_type;
         self
     }
 
     pub fn output_type(mut self, output_type: OutputType) -> Self {
-        self.output_type = Some(output_type);
+        self.output_type = output_type;
         self
     }
 
     pub fn sort_by(mut self, sort_by: SortBy) -> Self {
-        self.sort_by = Some(sort_by);
+        self.sort_by = sort_by;
         self
     }
 }

@@ -28,12 +28,12 @@ pub struct DatasetNewVersionRequest {
 }
 
 impl DatasetNewVersionRequest {
-    pub fn new(version_notes: String, files: Vec<DatasetUploadFile>) -> DatasetNewVersionRequest {
+    pub fn new(version_notes: String) -> DatasetNewVersionRequest {
         DatasetNewVersionRequest {
             version_notes,
             subtitle: None,
             description: None,
-            files,
+            files: Default::default(),
             convert_to_csv: None,
             category_ids: None,
             delete_old_versions: None,
