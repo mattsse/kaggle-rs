@@ -17,7 +17,7 @@ pub enum PushLanguageType {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ListLanguage {
+pub enum Language {
     All,
     Python,
     R,
@@ -25,44 +25,44 @@ pub enum ListLanguage {
     Julia,
 }
 
-impl Default for ListLanguage {
+impl Default for Language {
     fn default() -> Self {
-        ListLanguage::All
+        Language::All
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ListKernelType {
+pub enum KernelType {
     All,
     Script,
     Notebook,
 }
 
-impl Default for ListKernelType {
+impl Default for KernelType {
     fn default() -> Self {
-        ListKernelType::All
+        KernelType::All
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ListOutputType {
+pub enum OutputType {
     All,
     Visualization,
     Data,
 }
 
-impl Default for ListOutputType {
+impl Default for OutputType {
     fn default() -> Self {
-        ListOutputType::All
+        OutputType::All
     }
 }
 
 /// How to sort the result
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ListSortBy {
+pub enum SortBy {
     Hotness,
     CommentCount,
     DateCreated,
@@ -74,9 +74,9 @@ pub enum ListSortBy {
     VoteCount,
 }
 
-impl Default for ListSortBy {
+impl Default for SortBy {
     fn default() -> Self {
-        ListSortBy::Hotness
+        SortBy::Hotness
     }
 }
 
