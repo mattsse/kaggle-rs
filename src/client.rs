@@ -398,24 +398,48 @@ impl KaggleApiClient {
         Ok((content_length, last_modified))
     }
 
-    /// Upload a single file.
     async fn upload_file(
+        &self,
+        file: impl AsRef<Path>,
+        url: impl IntoUrl,
+    ) -> anyhow::Result<reqwest::Response> {
+        let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
+        Ok(Self::request(
+            self.client
+                .post(url)
+                .body(reqwest::Body::wrap_stream(stream)),
+        )
+        .await?)
+    }
+
+    /// Upload a single dataset file.
+    async fn upload_dataset_file(
         &self,
         file: impl AsRef<Path>,
         file_name: impl AsRef<str>,
         item: Option<&Resource>,
     ) -> anyhow::Result<DatasetUploadFile> {
+        let file = file.as_ref();
         let (content_length, last_modified) = Self::get_file_metadata(file)?;
+        // get the token first
         let info = self
             .datasets_upload_file(file_name.as_ref(), content_length, last_modified)
             .await?;
+
+        // complete the upload to retrieve a path from the url parameter
+        let _ = self.upload_file(file, &info.create_url).await?;
+
         let mut upload_file = DatasetUploadFile::new(info.token);
         if let Some(item) = item {
             upload_file.set_description(item.description.clone());
             if let Some(schema) = &item.schema {
                 upload_file.set_columns(schema.get_processed_columns());
             }
+            if let Some(schema) = &item.schema {
+                upload_file.set_columns(schema.get_processed_columns());
+            }
         }
+
         Ok(upload_file)
     }
 
@@ -424,14 +448,20 @@ impl KaggleApiClient {
         &self,
         folder: impl AsRef<Path>,
         resources: &[Resource],
-        archive_mode: ArchiveMode,
+        dir_mode: ArchiveMode,
     ) -> anyhow::Result<Vec<DatasetUploadFile>> {
         let mut uploads = Vec::with_capacity(resources.len());
 
         let resource_paths: HashMap<_, _> =
             resources.iter().map(|x| (x.path.as_str(), x)).collect();
 
-        let mut tmp = None;
+        let mut tmp_archive_dir = None;
+
+        let skip = &[
+            Self::DATASET_METADATA_FILE,
+            Self::OLD_DATASET_METADATA_FILE,
+            Self::KERNEL_METADATA_FILE,
+        ];
 
         for entry in WalkDir::new(folder)
             .min_depth(1)
@@ -446,26 +476,35 @@ impl KaggleApiClient {
                 .to_str()
                 .context("File name is not valid unicode")?;
 
+            let mut upload = None;
+
             if entry.path().is_file() {
+                if skip.contains(&file_name) {
+                    continue;
+                }
+                upload = Some(entry.path().to_path_buf());
+            } else if entry.path().is_dir() {
+                if tmp_archive_dir.is_none() {
+                    tmp_archive_dir = Some(TempDir::new("kaggle-upload")?);
+                }
+                let archive_path = tmp_archive_dir.as_ref().unwrap().path().join(file_name);
+                upload = dir_mode.make_archive(entry.path(), &archive_path)?;
+            }
+
+            if let Some(upload) = upload {
                 let upload_file = self
-                    .upload_file(
-                        entry.path(),
+                    .upload_dataset_file(
+                        upload,
                         file_name,
                         resource_paths.get(file_name).map(Deref::deref),
                     )
                     .await?;
                 uploads.push(upload_file);
-            } else if entry.path().is_dir() {
-                // TODO switch to self.download_dir or a tmp dir that is owned by the client
-                // preventing dropping/deleting
-                if tmp.is_none() {
-                    tmp = Some(TempDir::new("kaggle-upload")?);
-                }
-                // tmp.close()?
-
-                // TODO 1. archive archive_mode.make_archive
-                // 2. self.upload_file
             }
+        }
+        if let Some(tmp) = tmp_archive_dir {
+            // release all temporary archives
+            tmp.close()?;
         }
 
         Ok(uploads)
@@ -679,6 +718,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<serde_json::Value> {
         let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
 
+        // TODO json? or reqwest::response?
         Ok(Self::request_json(
             self.client
                 .put(url)
@@ -743,8 +783,8 @@ impl KaggleApiClient {
     pub async fn dataset_create_new(
         &self,
         folder: impl AsRef<Path>,
-        public: bool,
-        convert_to_csv: bool,
+        _public: bool,
+        _convert_to_csv: bool,
         archive_mode: ArchiveMode,
     ) -> anyhow::Result<ApiResp> {
         let folder = folder.as_ref();
@@ -753,7 +793,7 @@ impl KaggleApiClient {
 
         let meta_data: Metadata = serde_json::from_slice(&file)?;
 
-        let owner_slug = meta_data
+        let _owner_slug = meta_data
             .owner_slug()
             .ok_or_else(|| KaggleError::Metadata {
                 msg: "Missing owner slug in id".to_string(),
@@ -805,7 +845,7 @@ impl KaggleApiClient {
             request = request.subtitle(subtitle);
         }
 
-        let datasets = self
+        let _datasets = self
             .upload_files(folder, &meta_data.resources, archive_mode)
             .await?;
 
@@ -1001,14 +1041,22 @@ impl KaggleApiClient {
 pub enum ArchiveMode {
     Tar,
     Zip,
+    Skip,
 }
 
 impl ArchiveMode {
-    pub fn make_archive(&self, from: impl AsRef<Path>, to: impl AsRef<Path>) {
+    /// Create either a tar or zip file of the provided source path
+    pub fn make_archive(
+        &self,
+        _src: impl AsRef<Path>,
+        _to: impl AsRef<Path>,
+    ) -> anyhow::Result<Option<PathBuf>> {
         match self {
             ArchiveMode::Tar => {}
             ArchiveMode::Zip => {}
+            ArchiveMode::Skip => {}
         }
+        Ok(None)
     }
 }
 
