@@ -63,14 +63,52 @@ pub struct Schema {
 impl Schema {
     /// Process a column, check for the type, and return the processed column.
     pub fn get_processed_columns(&self) -> Vec<DatasetColumn> {
-        unimplemented!()
+        let mut columns = Vec::with_capacity(self.fields.len());
+
+        let str_types = &[
+            "string",
+            "date",
+            "time",
+            "yearmonth",
+            "duration",
+            "geopoint",
+            "geojson",
+        ];
+
+        for field in &self.fields {
+            let mut col = DatasetColumn::new(field.name.clone());
+            if let Some(desc) = &field.description {
+                col.set_description(desc.clone());
+            }
+            if let Some(ty) = &field.type_field {
+                let ty = ty.to_lowercase();
+
+                if str_types.contains(&ty.as_str()) {
+                    col.set_type("string".to_string());
+                } else if ty == "numeric" || ty == "number" || ty == "year" {
+                    col.set_type("numeric".to_string());
+                } else if ty == "boolean" {
+                    col.set_type("boolean".to_string());
+                } else if ty == "datetime" {
+                    col.set_type("datetime".to_string());
+                } else {
+                    // Possibly extended data type - not going to try to track those here. Will set
+                    // the type and let the server handle it.
+                    col.set_type(ty.clone());
+                }
+                col.set_original_type(ty);
+            }
+            columns.push(col);
+        }
+
+        columns
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Field {
     pub name: String,
-    pub description: String,
+    pub description: Option<String>,
     #[serde(rename = "type")]
-    pub type_field: String,
+    pub type_field: Option<String>,
 }

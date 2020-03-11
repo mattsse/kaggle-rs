@@ -18,11 +18,17 @@ pub struct DatasetColumn {
     #[serde(rename = "originalType")]
     original_type: Option<String>,
     /// The description of the column
-    #[serde(rename = "description")]
     description: Option<String>,
 }
 
 impl DatasetColumn {
+    pub fn new(name: impl ToString) -> Self {
+        Self {
+            name: Some(name.to_string()),
+            ..Default::default()
+        }
+    }
+
     pub fn set_order(&mut self, order: f32) {
         self.order = Some(order);
     }

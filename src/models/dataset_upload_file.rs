@@ -12,15 +12,15 @@ pub struct DatasetUploadFile {
     /// The file description
     description: Option<String>,
     /// A list of dataset column metadata
-    columns: Option<Vec<DatasetColumn>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    columns: Vec<DatasetColumn>,
 }
 
 impl DatasetUploadFile {
     pub fn new(token: impl ToString) -> Self {
         Self {
             token: token.to_string(),
-            description: None,
-            columns: None,
+            ..Default::default()
         }
     }
 
@@ -51,19 +51,10 @@ impl DatasetUploadFile {
     }
 
     pub fn set_columns(&mut self, columns: Vec<DatasetColumn>) {
-        self.columns = Some(columns);
+        self.columns = columns;
     }
 
-    pub fn with_columns(mut self, columns: Vec<DatasetColumn>) -> DatasetUploadFile {
-        self.columns = Some(columns);
-        self
-    }
-
-    pub fn columns(&self) -> Option<&Vec<DatasetColumn>> {
+    pub fn columns(&self) -> &Vec<DatasetColumn> {
         self.columns.as_ref()
-    }
-
-    pub fn reset_columns(&mut self) {
-        self.columns = None;
     }
 }

@@ -28,8 +28,10 @@ pub struct File {}
 pub struct Tag {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileUploadInfo {
     pub token: String,
+    pub create_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
