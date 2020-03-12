@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 use std::fmt;
-use std::io::Write;
+use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
@@ -20,6 +21,7 @@ use anyhow::{anyhow, Context};
 use crate::error::KaggleError;
 use crate::models::extended::{
     Competition,
+    Dataset,
     DatasetNewResponse,
     DatasetNewVersionResponse,
     File,
@@ -382,11 +384,9 @@ impl KaggleApiClient {
 
     /// Write the request's response to the provided output destination.
     async fn download_file(
-        req: reqwest::RequestBuilder,
+        mut res: reqwest::Response,
         output: impl AsRef<Path>,
     ) -> anyhow::Result<PathBuf> {
-        let mut res = req.send().await?;
-
         let output = output.as_ref();
         let mut file = tokio::fs::File::create(output).await?;
 
@@ -564,7 +564,9 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("/competitions/{}/leaderboard/download", id))?),
+                .get(self.join_url(format!("/competitions/{}/leaderboard/download", id))?)
+                .send()
+                .await?,
             output,
         )
         .await?)
@@ -598,7 +600,9 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("/competitions/data/download/{}/{}", id, file_name))?),
+                .get(self.join_url(format!("/competitions/data/download/{}/{}", id, file_name))?)
+                .send()
+                .await?,
             output,
         )
         .await?)
@@ -618,7 +622,9 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!(" /competitions/data/download-all/{}", id))?),
+                .get(self.join_url(format!("/competitions/data/download-all/{}", id))?)
+                .send()
+                .await?,
             output,
         )
         .await?)
@@ -967,13 +973,46 @@ impl KaggleApiClient {
             .await?)
     }
 
-    pub async fn datasets_download(
+    pub async fn dataset_download_all_files(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-        _dataset_version_number: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+        path: Option<impl AsRef<Path>>,
+        dataset_version_number: Option<&str>,
+    ) -> anyhow::Result<PathBuf> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+
+        let mut req = self
+            .client
+            .get(self.join_url(format!(
+                "/datasets/download/{}/{}",
+                owner_slug, dataset_slug
+            ))?)
+            .header(header::ACCEPT, HeaderValue::from_static("file"));
+
+        if let Some(version) = dataset_version_number {
+            req = req.query(&[("datasetVersionNumber", version)]);
+        }
+
+        let resp = Self::request(req).await?;
+
+        let folder = if let Some(path) = path {
+            path.as_ref().to_path_buf()
+        } else {
+            self.download_dir
+                .join(format!("datasets/{}/{}", owner_slug, dataset_slug,))
+        };
+        fs::create_dir_all(&folder)?;
+
+        let outfile =
+            Self::download_file(resp, folder.join(format!("{}.zip", dataset_slug))).await?;
+
+        unzip(&outfile)?;
+
+        // TODO add option to keep zip files
+        fs::remove_file(outfile)?;
+
+        Ok(folder)
     }
 
     /// Download a single file for a dataset.
@@ -983,41 +1022,43 @@ impl KaggleApiClient {
         dataset_slug: &str,
         file_name: &str,
         folder: Option<impl AsRef<Path>>,
-    ) -> anyhow::Result<ApiResp> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
-
-        let resp = self
-            .datasets_download_file(Some(owner_slug), dataset_slug, file_name, None)
-            .await?;
-
-        let path = if let Some(folder) = folder {
-            folder.as_ref().join("")
-        } else {
-            self.download_dir.as_path().join("")
-        };
-        unimplemented!("Not implemented yet.")
-    }
-
-    /// Download dataset file.
-    pub async fn datasets_download_file(
-        &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
-        file_name: &str,
         dataset_version_number: Option<&str>,
-    ) -> anyhow::Result<serde_json::Value> {
+    ) -> anyhow::Result<PathBuf> {
         let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
 
-        let mut req = self.client.get(self.join_url(format!(
-            "/datasets/download/{}/{}/{}",
-            owner_slug, dataset_slug, file_name
-        ))?);
+        let mut req = self
+            .client
+            .get(self.join_url(format!(
+                "/datasets/download/{}/{}/{}",
+                owner_slug, dataset_slug, file_name
+            ))?)
+            .header(header::ACCEPT, HeaderValue::from_static("file"));
 
         if let Some(version) = dataset_version_number {
             req = req.query(&[("datasetVersionNumber", version)]);
         }
 
-        Ok(Self::request_json(req).await?)
+        let resp = Self::request(req).await?;
+
+        let url = resp
+            .url()
+            .path_segments()
+            .context("redirected to invalid dataset download url")?
+            .last()
+            .context("no file segment in url download path")?;
+
+        let output = if let Some(folder) = folder {
+            folder.as_ref().to_path_buf()
+        } else {
+            self.download_dir
+                .join(format!("datasets/{}/{}", owner_slug, dataset_slug))
+        };
+        fs::create_dir_all(&output)?;
+        let outfile = output.join(url);
+
+        // TODO check if file is already available and is older than the Last-Modified
+        // header value
+        Ok(Self::download_file(resp, outfile).await?)
     }
 
     pub async fn datasets_list(
@@ -1037,7 +1078,7 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
-    /// List dataset files
+    /// List dataset files.
     pub async fn datasets_list_files(
         &self,
         owner_slug: Option<&str>,
@@ -1051,12 +1092,16 @@ impl KaggleApiClient {
         .await?)
     }
 
+    /// Get dataset creation status.
     pub async fn datasets_status(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+    ) -> anyhow::Result<serde_json::Value> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(self
+            .get_json(self.join_url(format!("/datasets/status/{}/{}", owner_slug, dataset_slug))?)
+            .await?)
     }
 
     /// Get URL and token to start uploading a data file.
@@ -1080,23 +1125,28 @@ impl KaggleApiClient {
         .await?)
     }
 
+    /// Show details about a dataset.
     pub async fn datasets_view(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+    ) -> anyhow::Result<Dataset> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        Ok(self
+            .get_json(self.join_url(format!("/datasets/view/{}/{}", owner_slug, dataset_slug))?)
+            .await?)
     }
 
+    /// Retrieve output for a specified kernel.
     pub async fn kernel_output(
         &self,
-        _user_name: &str,
-        _kernel_slug: &str,
+        user_name: Option<&str>,
+        kernel_slug: &str,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
 
-    /// Pull the latest code from a kernel
+    /// Pull the latest code from a kernel.
     pub async fn kernel_pull(
         &self,
         user_name: Option<&str>,
@@ -1126,7 +1176,7 @@ impl KaggleApiClient {
     /// an existing one.
     pub async fn kernel_push(
         &self,
-        _kernel_push_request: KernelPushRequest,
+        kernel_push_request: KernelPushRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
@@ -1155,7 +1205,7 @@ impl KaggleApiClient {
         .await?)
     }
 
-    /// Get the metadata for a dataset
+    /// Get the metadata for a dataset.
     pub async fn metadata_get(
         &self,
         owner_slug: Option<&str>,
@@ -1163,7 +1213,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<Metadata> {
         let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
         Ok(Self::request_json(self.client.get(self.join_url(format!(
-            " /datasets/metadata/{}/{}",
+            "/datasets/metadata/{}/{}",
             owner_slug, dataset_slug
         ))?))
         .await?)
@@ -1171,9 +1221,9 @@ impl KaggleApiClient {
 
     pub async fn metadata_post(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-        _settings: DatasetUpdateSettingsRequest,
+        owner_slug: &str,
+        dataset_slug: &str,
+        settings: DatasetUpdateSettingsRequest,
     ) -> anyhow::Result<ApiResp> {
         unimplemented!("Not implemented yet.")
     }
@@ -1223,6 +1273,42 @@ where
     R: AsyncRead,
 {
     codec::FramedRead::new(r, codec::BytesCodec::new()).map_ok(|bytes| bytes.freeze())
+}
+
+fn unzip(file: impl AsRef<Path>) -> anyhow::Result<()> {
+    let file = file.as_ref();
+
+    let file = fs::File::open(file)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let outpath = file.sanitized_name();
+
+        if (&*file.name()).ends_with('/') {
+            fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(&p)?;
+                }
+            }
+            let mut outfile = fs::File::create(&outpath)?;
+            io::copy(&mut file, &mut outfile)?;
+        }
+
+        // Get and Set permissions
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            if let Some(mode) = file.unix_mode() {
+                fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
