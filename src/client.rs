@@ -312,6 +312,25 @@ impl KaggleApiClient {
         Ok(self.base_url.join(path.as_ref())?)
     }
 
+    /// determine if a dataset string is valid, meaning it is in the format of
+    /// {username}/{dataset-slug}
+    pub fn get_user_and_dataset_slug(id: &str) -> Result<(&str, &str), KaggleError> {
+        let mut split = id.split('/');
+        if let Some(user) = split.next() {
+            if let Some(dataset) = split.next() {
+                if split.next().is_none() {
+                    return Ok((user, dataset));
+                }
+            }
+        }
+        Err(KaggleError::Metadata {
+            msg: format!(
+                "Invalid dataset string. expected form `{{username}}/{{dataset-slug}}`, but got {}",
+                id
+            ),
+        })
+    }
+
     async fn get<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
         Ok(Self::request(self.client.get(url)).await?.text().await?)
     }
@@ -794,8 +813,7 @@ impl KaggleApiClient {
 
         let meta_data: Metadata = Self::read_metadata_file(folder).await?;
 
-        let (owner_slug, dataset_slug) = meta_data
-            .get_user_and_dataset_slug()
+        let (owner_slug, dataset_slug) = Self::get_user_and_dataset_slug(&meta_data.id)
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         // validate
@@ -879,8 +897,7 @@ impl KaggleApiClient {
 
         let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
 
-        let (owner_slug, dataset_slug) = meta_data
-            .get_user_and_dataset_slug()
+        let (owner_slug, dataset_slug) = Self::get_user_and_dataset_slug(&meta_data.id)
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         if let Some(subtitle) = meta_data.subtitle {
@@ -959,14 +976,48 @@ impl KaggleApiClient {
         unimplemented!("Not implemented yet.")
     }
 
+    /// Download a single file for a dataset.
+    pub async fn dataset_download_file(
+        &self,
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+        file_name: &str,
+        folder: Option<impl AsRef<Path>>,
+    ) -> anyhow::Result<ApiResp> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+
+        let resp = self
+            .datasets_download_file(Some(owner_slug), dataset_slug, file_name, None)
+            .await?;
+
+        let path = if let Some(folder) = folder {
+            folder.as_ref().join("")
+        } else {
+            self.download_dir.as_path().join("")
+        };
+        unimplemented!("Not implemented yet.")
+    }
+
+    /// Download dataset file.
     pub async fn datasets_download_file(
         &self,
-        _owner_slug: &str,
-        _dataset_slug: &str,
-        _file_name: &str,
-        _dataset_version_number: &str,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        owner_slug: Option<&str>,
+        dataset_slug: &str,
+        file_name: &str,
+        dataset_version_number: Option<&str>,
+    ) -> anyhow::Result<serde_json::Value> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+
+        let mut req = self.client.get(self.join_url(format!(
+            "/datasets/download/{}/{}/{}",
+            owner_slug, dataset_slug, file_name
+        ))?);
+
+        if let Some(version) = dataset_version_number {
+            req = req.query(&[("datasetVersionNumber", version)]);
+        }
+
+        Ok(Self::request_json(req).await?)
     }
 
     pub async fn datasets_list(

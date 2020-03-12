@@ -30,25 +30,6 @@ impl Metadata {
         self.id.split('/').nth(1)
     }
 
-    /// determine if a dataset string is valid, meaning it is in the format of
-    /// {username}/{dataset-slug}
-    pub fn get_user_and_dataset_slug(&self) -> Result<(&str, &str), KaggleError> {
-        let mut split = self.id.split('/');
-        if let Some(user) = split.next() {
-            if let Some(dataset) = split.next() {
-                if split.next().is_none() {
-                    return Ok((user, dataset));
-                }
-            }
-        }
-        Err(KaggleError::Metadata {
-            msg: format!(
-                "Invalid dataset string. expected form `{{username}}/{{dataset-slug}}`, but got {}",
-                self.id
-            ),
-        })
-    }
-
     /// Validate resources is a wrapper to validate the existence of files and
     /// that there are no duplicates for a folder and set of resources.
     pub fn validate_resource(&self, root: impl AsRef<Path>) -> Result<(), KaggleError> {
