@@ -21,6 +21,7 @@ use crate::error::KaggleError;
 use crate::models::extended::{
     Competition,
     DatasetNewResponse,
+    DatasetNewVersionResponse,
     File,
     FileUploadInfo,
     Kernel,
@@ -793,19 +794,9 @@ impl KaggleApiClient {
 
         let meta_data: Metadata = Self::read_metadata_file(folder).await?;
 
-        let owner_slug = meta_data
-            .owner_slug()
-            .ok_or_else(|| KaggleError::Metadata {
-                msg: "Missing owner slug in id".to_string(),
-            })?
-            .to_string();
-
-        let dataset_slug = meta_data
-            .dataset_slug()
-            .ok_or_else(|| KaggleError::Metadata {
-                msg: "Missing dataset slug in id".to_string(),
-            })?
-            .to_string();
+        let (owner_slug, dataset_slug) = meta_data
+            .get_user_and_dataset_slug()
+            .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         // validate
         if dataset_slug == "INSERT_SLUG_HERE" {
@@ -878,12 +869,19 @@ impl KaggleApiClient {
         &self,
         folder: impl AsRef<Path>,
         version_notes: impl ToString,
-    ) -> anyhow::Result<ApiResp> {
+        convert_to_csv: bool,
+        delete_old_versions: bool,
+        archive_mode: ArchiveMode,
+    ) -> anyhow::Result<DatasetNewVersionResponse> {
         let folder = folder.as_ref();
         let meta_data = Self::read_metadata_file(folder).await?;
         let _ = meta_data.validate_resource(folder)?;
 
         let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
+
+        let (owner_slug, dataset_slug) = meta_data
+            .get_user_and_dataset_slug()
+            .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         if let Some(subtitle) = meta_data.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
@@ -894,25 +892,62 @@ impl KaggleApiClient {
             req.set_subtitle(subtitle);
         }
 
-        unimplemented!("Not implemented yet.")
+        let files = self
+            .upload_files(folder, &meta_data.resources, archive_mode)
+            .await?;
+
+        req.set_description(meta_data.description);
+        req.set_category_ids(meta_data.keywords);
+        req.set_convert_to_csv(convert_to_csv);
+        req.set_delete_old_versions(delete_old_versions);
+        req.set_files(files);
+
+        if let Some(id_no) = meta_data.id_no {
+            Ok(self.datasets_create_version_by_id(id_no, &req).await?)
+        } else {
+            if meta_data.id == format!("{}/INSERT_SLUG_HERE", self.credentials.user_name) {
+                Err(KaggleError::Metadata {
+                    msg: "Default slug detected, please change values before uploading".to_string(),
+                })?
+            }
+            Ok(self
+                .datasets_create_version(Some(&owner_slug), &dataset_slug, &req)
+                .await?)
+        }
     }
 
     /// Create a new dataset version
     pub async fn datasets_create_version(
         &self,
-        owner_slug: &str,
+        owner_slug: Option<&str>,
         dataset_slug: &str,
-        dataset_new_version_request: DatasetNewVersionRequest,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        dataset_req: &DatasetNewVersionRequest,
+    ) -> anyhow::Result<DatasetNewVersionResponse> {
+        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+
+        Ok(self
+            .post_json(
+                self.join_url(format!(
+                    "/datasets/create/version/{}/{}",
+                    owner_slug, dataset_slug
+                ))?,
+                Some(dataset_req),
+            )
+            .await?)
     }
 
+    /// Create a new dataset version by id
     pub async fn datasets_create_version_by_id(
         &self,
-        _id: i32,
-        _dataset_req: DatasetNewVersionRequest,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        id: i32,
+        dataset_req: &DatasetNewVersionRequest,
+    ) -> anyhow::Result<DatasetNewVersionResponse> {
+        Ok(self
+            .post_json(
+                self.join_url(format!("/datasets/create/version/{}", id))?,
+                Some(dataset_req),
+            )
+            .await?)
     }
 
     pub async fn datasets_download(
@@ -960,7 +995,7 @@ impl KaggleApiClient {
         let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
         Ok(Self::request_json(
             self.client
-                .get(self.join_url(format!(" /datasets/list/{}/{}", owner_slug, dataset_slug))?),
+                .get(self.join_url(format!("/datasets/list/{}/{}", owner_slug, dataset_slug))?),
         )
         .await?)
     }
