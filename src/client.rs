@@ -315,19 +315,24 @@ impl KaggleApiClient {
     }
 
     /// determine if a dataset string is valid, meaning it is in the format of
-    /// {username}/{dataset-slug}
-    pub fn get_user_and_dataset_slug(id: &str) -> Result<(&str, &str), KaggleError> {
+    /// {username}/{identifier-slug}
+    pub fn get_user_and_identifier_slug<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> Result<(&'a str, &'a str), KaggleError> {
         let mut split = id.split('/');
         if let Some(user) = split.next() {
-            if let Some(dataset) = split.next() {
+            if let Some(ident) = split.next() {
                 if split.next().is_none() {
-                    return Ok((user, dataset));
+                    return Ok((user, ident));
                 }
+            } else {
+                return Ok((&self.credentials.user_name, user));
             }
         }
         Err(KaggleError::Metadata {
             msg: format!(
-                "Invalid dataset string. expected form `{{username}}/{{dataset-slug}}`, but got {}",
+                "Invalid identifier string. expected form `{{username}}/{{identifier-slug}}`, but got {}",
                 id
             ),
         })
@@ -819,7 +824,8 @@ impl KaggleApiClient {
 
         let meta_data: Metadata = Self::read_metadata_file(folder).await?;
 
-        let (owner_slug, dataset_slug) = Self::get_user_and_dataset_slug(&meta_data.id)
+        let (owner_slug, dataset_slug) = self
+            .get_user_and_identifier_slug(&meta_data.id)
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         // validate
@@ -903,9 +909,6 @@ impl KaggleApiClient {
 
         let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
 
-        let (owner_slug, dataset_slug) = Self::get_user_and_dataset_slug(&meta_data.id)
-            .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
-
         if let Some(subtitle) = meta_data.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
                 Err(KaggleError::Metadata {
@@ -933,20 +936,17 @@ impl KaggleApiClient {
                     msg: "Default slug detected, please change values before uploading".to_string(),
                 })?
             }
-            Ok(self
-                .datasets_create_version(Some(&owner_slug), &dataset_slug, &req)
-                .await?)
+            Ok(self.datasets_create_version(&meta_data.id, &req).await?)
         }
     }
 
     /// Create a new dataset version
     pub async fn datasets_create_version(
         &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
+        name: &str,
         dataset_req: &DatasetNewVersionRequest,
     ) -> anyhow::Result<DatasetNewVersionResponse> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
 
         Ok(self
             .post_json(
@@ -975,12 +975,11 @@ impl KaggleApiClient {
 
     pub async fn dataset_download_all_files(
         &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
+        name: &str,
         path: Option<impl AsRef<Path>>,
         dataset_version_number: Option<&str>,
     ) -> anyhow::Result<PathBuf> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
 
         let mut req = self
             .client
@@ -1018,13 +1017,12 @@ impl KaggleApiClient {
     /// Download a single file for a dataset.
     pub async fn dataset_download_file(
         &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
+        name: &str,
         file_name: &str,
         folder: Option<impl AsRef<Path>>,
         dataset_version_number: Option<&str>,
     ) -> anyhow::Result<PathBuf> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
 
         let mut req = self
             .client
@@ -1079,12 +1077,8 @@ impl KaggleApiClient {
     }
 
     /// List dataset files.
-    pub async fn datasets_list_files(
-        &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
-    ) -> anyhow::Result<ListFilesResult> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn datasets_list_files(&self, name: &str) -> anyhow::Result<ListFilesResult> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(Self::request_json(
             self.client
                 .get(self.join_url(format!("/datasets/list/{}/{}", owner_slug, dataset_slug))?),
@@ -1093,12 +1087,8 @@ impl KaggleApiClient {
     }
 
     /// Get dataset creation status.
-    pub async fn datasets_status(
-        &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
-    ) -> anyhow::Result<serde_json::Value> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn datasets_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(self
             .get_json(self.join_url(format!("/datasets/status/{}/{}", owner_slug, dataset_slug))?)
             .await?)
@@ -1126,36 +1116,25 @@ impl KaggleApiClient {
     }
 
     /// Show details about a dataset.
-    pub async fn datasets_view(
-        &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
-    ) -> anyhow::Result<Dataset> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn datasets_view(&self, name: &str) -> anyhow::Result<Dataset> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(self
             .get_json(self.join_url(format!("/datasets/view/{}/{}", owner_slug, dataset_slug))?)
             .await?)
     }
 
     /// Retrieve output for a specified kernel.
-    pub async fn kernel_output(
-        &self,
-        user_name: Option<&str>,
-        kernel_slug: &str,
-    ) -> anyhow::Result<ApiResp> {
+    pub async fn kernel_output(&self, name: &str) -> anyhow::Result<ApiResp> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         unimplemented!("Not implemented yet.")
     }
 
     /// Pull the latest code from a kernel.
-    pub async fn kernel_pull(
-        &self,
-        user_name: Option<&str>,
-        kernel_slug: &str,
-    ) -> anyhow::Result<serde_json::Value> {
-        let user_name = user_name.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn kernel_pull(&self, name: &str) -> anyhow::Result<serde_json::Value> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(Self::request_json(self.client.get(self.join_url(format!(
             "/kernels/pull?userName={}&kernelSlug={}",
-            user_name, kernel_slug
+            owner_slug, kernel_slug
         ))?))
         .await?)
     }
@@ -1164,11 +1143,11 @@ impl KaggleApiClient {
     /// associated files to a specified path.
     pub async fn kernel_pull_write(
         &self,
-        user_name: Option<&str>,
-        kernel_slug: &str,
+        name: &str,
         with_metadata: bool,
         output: impl AsRef<Path>,
     ) -> anyhow::Result<ApiResp> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         unimplemented!()
     }
 
@@ -1182,15 +1161,11 @@ impl KaggleApiClient {
     }
 
     /// Get the status of a kernel.
-    pub async fn kernel_status(
-        &self,
-        user_name: Option<&str>,
-        kernel_slug: &str,
-    ) -> anyhow::Result<serde_json::Value> {
-        let user_name = user_name.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn kernel_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(Self::request_json(self.client.get(self.join_url(format!(
             "/kernels/status?userName={}&kernelSlug={}",
-            user_name, kernel_slug
+            owner_slug, kernel_slug
         ))?))
         .await?)
     }
@@ -1206,12 +1181,8 @@ impl KaggleApiClient {
     }
 
     /// Get the metadata for a dataset.
-    pub async fn metadata_get(
-        &self,
-        owner_slug: Option<&str>,
-        dataset_slug: &str,
-    ) -> anyhow::Result<Metadata> {
-        let owner_slug = owner_slug.unwrap_or_else(|| self.credentials.user_name.as_str());
+    pub async fn metadata_get(&self, name: &str) -> anyhow::Result<Metadata> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(Self::request_json(self.client.get(self.join_url(format!(
             "/datasets/metadata/{}/{}",
             owner_slug, dataset_slug
@@ -1221,10 +1192,11 @@ impl KaggleApiClient {
 
     pub async fn metadata_post(
         &self,
-        owner_slug: &str,
-        dataset_slug: &str,
+        name: &str,
         settings: DatasetUpdateSettingsRequest,
     ) -> anyhow::Result<ApiResp> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+
         unimplemented!("Not implemented yet.")
     }
 }
