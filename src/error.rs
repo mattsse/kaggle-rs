@@ -8,3 +8,11 @@ pub enum KaggleError {
     #[error("Metadata error: {}", msg)]
     Metadata { msg: String },
 }
+
+impl KaggleError {
+    pub(crate) fn meta(msg: impl ToString) -> Self {
+        KaggleError::Metadata {
+            msg: msg.to_string(),
+        }
+    }
+}

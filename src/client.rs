@@ -401,8 +401,14 @@ impl KaggleApiClient {
         Ok(output.to_path_buf())
     }
 
-    async fn read_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Metadata> {
+    async fn read_dataset_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Metadata> {
         let meta_file = Self::get_dataset_metadata_file(path)?;
+        let file = tokio::fs::read(&meta_file).await?;
+        Ok(serde_json::from_slice(&file)?)
+    }
+
+    async fn read_kernel_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Metadata> {
+        let meta_file = Self::get_kernel_metadata_file(path)?;
         let file = tokio::fs::read(&meta_file).await?;
         Ok(serde_json::from_slice(&file)?)
     }
@@ -420,6 +426,24 @@ impl KaggleApiClient {
                 }
             } else {
                 Ok(file)
+            }
+        } else {
+            if path.exists() {
+                Ok(path)
+            } else {
+                Err(KaggleError::FileNotFound(path))?
+            }
+        }
+    }
+
+    fn get_kernel_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
+        let path = path.as_ref().to_path_buf();
+        if path.is_dir() {
+            let file = path.join(Self::KERNEL_METADATA_FILE);
+            if file.exists() {
+                Ok(file)
+            } else {
+                Err(KaggleError::FileNotFound(file))?
             }
         } else {
             if path.exists() {
@@ -822,7 +846,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<DatasetNewResponse> {
         let folder = folder.as_ref();
 
-        let meta_data: Metadata = Self::read_metadata_file(folder).await?;
+        let meta_data: Metadata = Self::read_dataset_metadata_file(folder).await?;
 
         let (owner_slug, dataset_slug) = self
             .get_user_and_identifier_slug(&meta_data.id)
@@ -830,38 +854,36 @@ impl KaggleApiClient {
 
         // validate
         if dataset_slug == "INSERT_SLUG_HERE" {
-            Err(KaggleError::Metadata {
-                msg: "Default slug detected, please change values before uploading".to_string(),
-            })?
+            Err(KaggleError::meta(
+                "Default slug detected, please change values before uploading",
+            ))?
         }
         if meta_data.title == "INSERT_SLUG_HERE" {
-            Err(KaggleError::Metadata {
-                msg: "Default title detected, please change values before uploading".to_string(),
-            })?
+            Err(KaggleError::meta(
+                "Default title detected, please change values before uploading",
+            ))?
         }
         if meta_data.licenses.len() != 1 {
-            Err(KaggleError::Metadata {
-                msg: "Please specify exactly one license".to_string(),
-            })?
+            Err(KaggleError::meta("Please specify exactly one license"))?
         }
         if dataset_slug.len() < 6 || dataset_slug.len() > 50 {
-            Err(KaggleError::Metadata {
-                msg: "The dataset slug must be between 6 and 50 characters".to_string(),
-            })?
+            Err(KaggleError::meta(
+                "The dataset slug must be between 6 and 50 characters",
+            ))?
         }
         if meta_data.title.len() < 6 || meta_data.title.len() > 50 {
-            Err(KaggleError::Metadata {
-                msg: "The dataset title must be between 6 and 50 characters".to_string(),
-            })?
+            Err(KaggleError::meta(
+                "The dataset title must be between 6 and 50 characters",
+            ))?
         }
         let _ = meta_data.validate_resource(folder)?;
 
         let mut request = DatasetNewRequest::builder(meta_data.title);
         if let Some(subtitle) = &meta_data.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
-                Err(KaggleError::Metadata {
-                    msg: "Subtitle length must be between 20 and 80 characters".to_string(),
-                })?
+                Err(KaggleError::meta(
+                    "Subtitle length must be between 20 and 80 characters",
+                ))?
             }
             request = request.subtitle(subtitle);
         }
@@ -904,7 +926,7 @@ impl KaggleApiClient {
         archive_mode: ArchiveMode,
     ) -> anyhow::Result<DatasetNewVersionResponse> {
         let folder = folder.as_ref();
-        let meta_data = Self::read_metadata_file(folder).await?;
+        let meta_data = Self::read_dataset_metadata_file(folder).await?;
         let _ = meta_data.validate_resource(folder)?;
 
         let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
@@ -1141,6 +1163,31 @@ impl KaggleApiClient {
         unimplemented!()
     }
 
+    /// read the metadata file and kernel files from a notebook, validate both,
+    /// and use Kernel API to push to Kaggle if all is valid.
+    pub async fn kernels_push(&self, folder: impl AsRef<Path>) -> anyhow::Result<ApiResp> {
+        let metadata = Self::read_kernel_metadata_file(folder).await?;
+
+        if metadata.title.len() < 5 {
+            Err(KaggleError::meta("Title must be at least five characters"))?
+        }
+
+        // title = self.get_or_default(meta_data, 'title', None)
+        //         if title and len(title) < 5:
+        //             raise ValueError('Title must be at least five characters')
+        //
+        //         code_path = self.get_or_default(meta_data, 'code_file', '')
+        //         if not code_path:
+        //             raise ValueError('A source file must be specified in the
+        // metadata')
+        //
+        //         code_file = os.path.join(folder, code_path)
+        //         if not os.path.isfile(code_file):
+        //             raise ValueError('Source file not found: ' + code_file)
+
+        unimplemented!("Not implemented yet.")
+    }
+
     /// Push a new kernel version. Can be used to create a new kernel and update
     /// an existing one.
     pub async fn kernel_push(
@@ -1187,10 +1234,10 @@ impl KaggleApiClient {
         path: Option<impl AsRef<Path>>,
     ) -> anyhow::Result<serde_json::Value> {
         let metadata = if let Some(path) = path {
-            Self::read_metadata_file(path).await?
+            Self::read_dataset_metadata_file(path).await?
         } else {
             let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
-            Self::read_metadata_file(
+            Self::read_dataset_metadata_file(
                 self.download_dir
                     .join(format!("datasets/{}/{}", owner_slug, dataset_slug)),
             )
