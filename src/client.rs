@@ -40,7 +40,7 @@ use crate::models::{
     DatasetUploadFile,
     KernelPushRequest,
 };
-use crate::request::{CompetitionsList, KernelsList};
+use crate::request::{CompetitionsList, DatasetsList, KernelsList};
 use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
@@ -1059,21 +1059,11 @@ impl KaggleApiClient {
         Ok(Self::download_file(resp, outfile).await?)
     }
 
-    pub async fn datasets_list(
-        &self,
-        _group: &str,
-        _sort_by: &str,
-        _size: &str,
-        _filetype: &str,
-        _license: &str,
-        _tagids: &str,
-        _search: &str,
-        _user: &str,
-        _page: usize,
-        _max_size: i64,
-        _min_size: i64,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+    pub async fn datasets_list(&self, list: &DatasetsList) -> anyhow::Result<Vec<Dataset>> {
+        Ok(
+            Self::request_json(self.client.get(self.join_url("datasets/list")?).query(list))
+                .await?,
+        )
     }
 
     /// List dataset files.
@@ -1212,8 +1202,8 @@ impl ArchiveMode {
     /// Create either a tar or zip file of the provided source path
     pub fn make_archive(
         &self,
-        _src: impl AsRef<Path>,
-        _to: impl AsRef<Path>,
+        src: impl AsRef<Path>,
+        to: impl AsRef<Path>,
     ) -> anyhow::Result<Option<PathBuf>> {
         // TODO implement
         match self {

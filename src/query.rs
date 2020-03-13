@@ -205,3 +205,17 @@ impl Default for Group {
         Group::Everyone
     }
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DatasetGroup {
+    Public,
+    My,
+    User,
+}
+
+impl Default for DatasetGroup {
+    fn default() -> Self {
+        DatasetGroup::Public
+    }
+}

@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize, Serializer};
 
+use crate::models::extended::Tag;
 use crate::query::{
     CompetitionCategory,
     CompetitionGroup,
     CompetitionSortBy,
+    DatasetFileType,
+    DatasetGroup,
+    DatasetLicenseName,
     Group,
     KernelType,
     Language,
@@ -163,6 +167,122 @@ impl KernelsList {
     pub fn sort_by(mut self, sort_by: SortBy) -> Self {
         self.sort_by = sort_by;
         self
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetsList {
+    /// How to sort the result, see valid_dataset_sort_bys for options
+    #[serde(with = "crate::none_as_empty")]
+    pub sort_by: Option<SortBy>,
+    /// The format, see valid_dataset_file_types for string options
+    #[serde(with = "crate::none_as_empty")]
+    pub filetype: Option<DatasetFileType>,
+    /// Tag identifiers to filter the search
+    pub tagids: Option<String>,
+    /// Descriptor for the license
+    pub license: Option<DatasetLicenseName>,
+    /// Search term to use (default is empty string)
+    #[serde(with = "crate::none_as_empty")]
+    pub search: Option<String>,
+    /// Display datasets by a specific user or organization
+    #[serde(with = "crate::none_as_empty")]
+    pub user: Option<String>,
+    /// The page to return.
+    pub page: usize,
+    /// The maximum size of the dataset to return
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_size: Option<usize>,
+    /// The minimum size of the dataset to return
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_size: Option<usize>,
+    /// Display datasets by a particular group
+    group: DatasetGroup,
+}
+
+impl DatasetsList {
+    pub fn builder() -> Self {
+        Self::default()
+    }
+
+    pub fn with_page(page: usize) -> Self {
+        Self {
+            page,
+            sort_by: None,
+            filetype: None,
+            tagids: None,
+            license: None,
+            search: None,
+            user: None,
+            max_size: None,
+            min_size: None,
+            group: DatasetGroup::default(),
+        }
+    }
+
+    pub fn page(mut self, page: usize) -> Self {
+        self.page = page;
+        self
+    }
+
+    pub fn max_size(mut self, max_size: usize) -> Self {
+        self.max_size = Some(max_size);
+        self
+    }
+
+    pub fn min_size(mut self, min_size: usize) -> Self {
+        self.min_size = Some(min_size);
+        self
+    }
+
+    pub fn file_type(mut self, file_type: DatasetFileType) -> Self {
+        self.filetype = Some(file_type);
+        self
+    }
+
+    pub fn search(mut self, search: impl ToString) -> Self {
+        self.search = Some(search.to_string());
+        self
+    }
+
+    pub fn user(mut self, user: impl ToString) -> Self {
+        self.user = Some(user.to_string());
+        self.group = DatasetGroup::User;
+        self
+    }
+
+    pub fn mine(mut self) -> Self {
+        self.user = None;
+        self.group = DatasetGroup::My;
+        self
+    }
+
+    pub fn public(mut self) -> Self {
+        self.user = None;
+        self.group = DatasetGroup::Public;
+        self
+    }
+
+    pub fn license_name(mut self, license_name: DatasetLicenseName) -> Self {
+        self.license = Some(license_name);
+        self
+    }
+
+    pub fn sort_by(mut self, sort_by: SortBy) -> Self {
+        self.sort_by = Some(sort_by);
+        self
+    }
+
+    pub fn tag_ids(mut self, tag_ids: impl ToString) -> Self {
+        self.tagids = Some(tag_ids.to_string());
+        self
+    }
+}
+
+impl Default for DatasetsList {
+    fn default() -> Self {
+        Self::with_page(1)
     }
 }
 
