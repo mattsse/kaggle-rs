@@ -1,3 +1,4 @@
+use crate::models::{Collaborator, License};
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::Value;
@@ -8,29 +9,41 @@ pub struct DatasetUpdateSettingsRequest {
     title: Option<String>,
     /// Subtitle of the dataset
     subtitle: Option<String>,
-    /// Decription of the dataset
+    /// Description of the dataset
     description: Option<String>,
     /// Whether or not the dataset should be private
     #[serde(rename = "isPrivate")]
     is_private: Option<bool>,
     /// A list of licenses that apply to this dataset
-    licenses: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    licenses: Vec<License>,
     /// A list of keywords that apply to this dataset
-    keywords: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    keywords: Vec<String>,
     /// A list of collaborators that may read or edit this dataset
-    collaborators: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    collaborators: Vec<Collaborator>,
     /// A list containing metadata for each file in the dataset
-    data: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    data: Option<serde_json::Value>,
 }
 
 impl DatasetUpdateSettingsRequest {
-    pub fn set_title(&mut self, title: String) {
-        self.title = Some(title);
+    pub fn with_title(title: impl ToString) -> Self {
+        Self {
+            title: Some(title.to_string()),
+            subtitle: None,
+            description: None,
+            is_private: None,
+            licenses: Default::default(),
+            keywords: Default::default(),
+            collaborators: Default::default(),
+            data: Default::default(),
+        }
     }
 
-    pub fn with_title(mut self, title: String) -> DatasetUpdateSettingsRequest {
+    pub fn set_title(&mut self, title: String) {
         self.title = Some(title);
-        self
     }
 
     pub fn title(&self) -> Option<&String> {
@@ -92,71 +105,58 @@ impl DatasetUpdateSettingsRequest {
         self.is_private = None;
     }
 
-    pub fn set_licenses(&mut self, licenses: Vec<Value>) {
-        self.licenses = Some(licenses);
+    pub fn set_licenses(&mut self, licenses: Vec<License>) {
+        self.licenses = licenses;
     }
 
-    pub fn with_licenses(mut self, licenses: Vec<Value>) -> DatasetUpdateSettingsRequest {
-        self.licenses = Some(licenses);
+    pub fn with_licenses(mut self, licenses: Vec<License>) -> DatasetUpdateSettingsRequest {
+        self.licenses = licenses;
         self
     }
 
-    pub fn licenses(&self) -> Option<&Vec<Value>> {
+    pub fn licenses(&self) -> &Vec<License> {
         self.licenses.as_ref()
     }
 
-    pub fn reset_licenses(&mut self) {
-        self.licenses = None;
-    }
-
     pub fn set_keywords(&mut self, keywords: Vec<String>) {
-        self.keywords = Some(keywords);
+        self.keywords = keywords;
     }
 
     pub fn with_keywords(mut self, keywords: Vec<String>) -> DatasetUpdateSettingsRequest {
-        self.keywords = Some(keywords);
+        self.keywords = keywords;
         self
     }
 
-    pub fn keywords(&self) -> Option<&Vec<String>> {
+    pub fn keywords(&self) -> &Vec<String> {
         self.keywords.as_ref()
     }
 
-    pub fn reset_keywords(&mut self) {
-        self.keywords = None;
+    pub fn set_collaborators(&mut self, collaborators: Vec<Collaborator>) {
+        self.collaborators = collaborators;
     }
 
-    pub fn set_collaborators(&mut self, collaborators: Vec<Value>) {
-        self.collaborators = Some(collaborators);
-    }
-
-    pub fn with_collaborators(mut self, collaborators: Vec<Value>) -> DatasetUpdateSettingsRequest {
-        self.collaborators = Some(collaborators);
+    pub fn with_collaborators(
+        mut self,
+        collaborators: Vec<Collaborator>,
+    ) -> DatasetUpdateSettingsRequest {
+        self.collaborators = collaborators;
         self
     }
 
-    pub fn collaborators(&self) -> Option<&Vec<Value>> {
+    pub fn collaborators(&self) -> &Vec<Collaborator> {
         self.collaborators.as_ref()
     }
 
-    pub fn reset_collaborators(&mut self) {
-        self.collaborators = None;
-    }
-
-    pub fn set_data(&mut self, data: Vec<Value>) {
+    pub fn set_data(&mut self, data: serde_json::Value) {
         self.data = Some(data);
     }
 
-    pub fn with_data(mut self, data: Vec<Value>) -> DatasetUpdateSettingsRequest {
+    pub fn with_data(mut self, data: serde_json::Value) -> DatasetUpdateSettingsRequest {
         self.data = Some(data);
         self
     }
 
-    pub fn data(&self) -> Option<&Vec<Value>> {
+    pub fn data(&self) -> Option<&serde_json::Value> {
         self.data.as_ref()
-    }
-
-    pub fn reset_data(&mut self) {
-        self.data = None;
     }
 }

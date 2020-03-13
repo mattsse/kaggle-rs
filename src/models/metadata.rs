@@ -1,5 +1,5 @@
 use crate::error::KaggleError;
-use crate::models::{DatasetColumn, License};
+use crate::models::{Collaborator, DatasetColumn, DatasetUpdateSettingsRequest, License};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -13,12 +13,19 @@ pub struct Metadata {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub id_no: Option<i32>,
+    /// Whether or not the dataset should be private
+    #[serde(rename = "isPrivate")]
+    pub is_private: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub collaborators: Vec<Collaborator>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub licenses: Vec<License>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub resources: Vec<Resource>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub keywords: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<serde_json::Value>,
 }
 
 impl Metadata {
@@ -51,6 +58,26 @@ impl Metadata {
         }
 
         Ok(())
+    }
+}
+
+impl Into<DatasetUpdateSettingsRequest> for Metadata {
+    fn into(self) -> DatasetUpdateSettingsRequest {
+        let mut settings = DatasetUpdateSettingsRequest::with_title(self.title)
+            .with_description(self.description)
+            .with_licenses(self.licenses)
+            .with_keywords(self.keywords)
+            .with_collaborators(self.collaborators);
+        if let Some(s) = self.subtitle {
+            settings.set_subtitle(s);
+        }
+        if let Some(p) = self.is_private {
+            settings.set_is_private(p);
+        }
+        if let Some(d) = self.data {
+            settings.set_data(d);
+        }
+        settings
     }
 }
 

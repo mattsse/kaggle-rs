@@ -890,7 +890,7 @@ impl KaggleApiClient {
         new_dataset: DatasetNewRequest,
     ) -> anyhow::Result<DatasetNewResponse> {
         Ok(self
-            .post_json("/datasets/create/new", Some(&new_dataset))
+            .post_json(self.join_url("/datasets/create/new")?, Some(&new_dataset))
             .await?)
     }
 
@@ -1180,14 +1180,43 @@ impl KaggleApiClient {
         .await?)
     }
 
+    /// Update the metadata for a dataset
+    pub async fn dataset_metadata_update(
+        &self,
+        name: &str,
+        path: Option<impl AsRef<Path>>,
+    ) -> anyhow::Result<serde_json::Value> {
+        let metadata = if let Some(path) = path {
+            Self::read_metadata_file(path).await?
+        } else {
+            let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+            Self::read_metadata_file(
+                self.download_dir
+                    .join(format!("datasets/{}/{}", owner_slug, dataset_slug)),
+            )
+            .await?
+        };
+
+        let settings = metadata.into();
+        Ok(self.metadata_post(name, &settings).await?)
+    }
+
     pub async fn metadata_post(
         &self,
         name: &str,
-        settings: DatasetUpdateSettingsRequest,
-    ) -> anyhow::Result<ApiResp> {
+        settings: &DatasetUpdateSettingsRequest,
+    ) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
 
-        unimplemented!("Not implemented yet.")
+        Ok(self
+            .post_json(
+                self.join_url(format!(
+                    "/datasets/metadata/{}/{}",
+                    owner_slug, dataset_slug
+                ))?,
+                Some(settings),
+            )
+            .await?)
     }
 }
 
@@ -1219,15 +1248,6 @@ impl Default for ArchiveMode {
     fn default() -> Self {
         ArchiveMode::Skip
     }
-}
-
-fn into_byte_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<u8>>
-where
-    R: AsyncRead,
-{
-    codec::FramedRead::new(r, codec::BytesCodec::new())
-        .map_ok(|bytes| stream::iter(bytes).map(Ok))
-        .try_flatten()
 }
 
 fn into_bytes_stream<R>(r: R) -> impl Stream<Item = tokio::io::Result<Bytes>>
