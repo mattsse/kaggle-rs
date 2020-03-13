@@ -13,6 +13,8 @@ pub struct Metadata {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub id_no: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub code_file: Option<String>,
     /// Whether or not the dataset should be private
     #[serde(rename = "isPrivate")]
     pub is_private: Option<bool>,

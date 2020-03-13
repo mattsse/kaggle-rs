@@ -846,10 +846,10 @@ impl KaggleApiClient {
     ) -> anyhow::Result<DatasetNewResponse> {
         let folder = folder.as_ref();
 
-        let meta_data: Metadata = Self::read_dataset_metadata_file(folder).await?;
+        let metadata: Metadata = Self::read_dataset_metadata_file(folder).await?;
 
         let (owner_slug, dataset_slug) = self
-            .get_user_and_identifier_slug(&meta_data.id)
+            .get_user_and_identifier_slug(&metadata.id)
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         // validate
@@ -858,12 +858,12 @@ impl KaggleApiClient {
                 "Default slug detected, please change values before uploading",
             ))?
         }
-        if meta_data.title == "INSERT_SLUG_HERE" {
+        if metadata.title == "INSERT_SLUG_HERE" {
             Err(KaggleError::meta(
                 "Default title detected, please change values before uploading",
             ))?
         }
-        if meta_data.licenses.len() != 1 {
+        if metadata.licenses.len() != 1 {
             Err(KaggleError::meta("Please specify exactly one license"))?
         }
         if dataset_slug.len() < 6 || dataset_slug.len() > 50 {
@@ -871,15 +871,15 @@ impl KaggleApiClient {
                 "The dataset slug must be between 6 and 50 characters",
             ))?
         }
-        if meta_data.title.len() < 6 || meta_data.title.len() > 50 {
+        if metadata.title.len() < 6 || metadata.title.len() > 50 {
             Err(KaggleError::meta(
                 "The dataset title must be between 6 and 50 characters",
             ))?
         }
-        let _ = meta_data.validate_resource(folder)?;
+        let _ = metadata.validate_resource(folder)?;
 
-        let mut request = DatasetNewRequest::builder(meta_data.title);
-        if let Some(subtitle) = &meta_data.subtitle {
+        let mut request = DatasetNewRequest::builder(metadata.title);
+        if let Some(subtitle) = &metadata.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
                 Err(KaggleError::meta(
                     "Subtitle length must be between 20 and 80 characters",
@@ -889,17 +889,17 @@ impl KaggleApiClient {
         }
 
         let files = self
-            .upload_files(folder, &meta_data.resources, archive_mode)
+            .upload_files(folder, &metadata.resources, archive_mode)
             .await?;
 
         let request = request
             .slug(dataset_slug)
             .owner_slug(owner_slug)
-            .license_name(meta_data.licenses[0].to_string())
-            .description(meta_data.description)
+            .license_name(metadata.licenses[0].to_string())
+            .description(metadata.description)
             .private(!public)
             .convert_to_csv(convert_to_csv)
-            .category_ids(meta_data.keywords)
+            .category_ids(metadata.keywords)
             .files(files)
             .build();
 
@@ -1166,24 +1166,38 @@ impl KaggleApiClient {
     /// read the metadata file and kernel files from a notebook, validate both,
     /// and use Kernel API to push to Kaggle if all is valid.
     pub async fn kernels_push(&self, folder: impl AsRef<Path>) -> anyhow::Result<ApiResp> {
+        let folder = folder.as_ref();
         let metadata = Self::read_kernel_metadata_file(folder).await?;
 
         if metadata.title.len() < 5 {
             Err(KaggleError::meta("Title must be at least five characters"))?
         }
 
-        // title = self.get_or_default(meta_data, 'title', None)
-        //         if title and len(title) < 5:
-        //             raise ValueError('Title must be at least five characters')
-        //
-        //         code_path = self.get_or_default(meta_data, 'code_file', '')
-        //         if not code_path:
-        //             raise ValueError('A source file must be specified in the
-        // metadata')
-        //
-        //         code_file = os.path.join(folder, code_path)
-        //         if not os.path.isfile(code_file):
-        //             raise ValueError('Source file not found: ' + code_file)
+        let code_path = metadata
+            .code_file
+            .ok_or_else(|| KaggleError::meta("A source file must be specified in the metadata"))?;
+
+        let code_file = folder.join(code_path);
+        if !code_file.is_file() && !code_file.exists() {
+            Err(KaggleError::meta(format!(
+                "Source file not found:{}",
+                code_file.display()
+            )))?
+        }
+
+        let (owner_slug, kernel_slug) = self
+            .get_user_and_identifier_slug(&metadata.id)
+            .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
+
+        if kernel_slug.to_lowercase() != slug::slugify(&metadata.title) {
+            Err(KaggleError::meta(
+                "kernel title does not resolve to the specified id",
+            ))?
+        }
+
+        if let Some(id_no) = metadata.id_no {
+        } else {
+        }
 
         unimplemented!("Not implemented yet.")
     }
