@@ -1,5 +1,6 @@
 use crate::error::KaggleError;
 use crate::models::{Collaborator, DatasetColumn, DatasetUpdateSettingsRequest, License};
+use crate::query::{Language, PushKernelType, PushLanguageType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -15,9 +16,17 @@ pub struct Metadata {
     pub id_no: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub code_file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub language: Option<PushLanguageType>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub kernel_type: Option<PushKernelType>,
     /// Whether or not the dataset should be private
-    #[serde(rename = "isPrivate")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub is_private: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enable_gpu: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enable_internet: Option<bool>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub collaborators: Vec<Collaborator>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -26,6 +35,12 @@ pub struct Metadata {
     pub resources: Vec<Resource>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub keywords: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub kernel_sources: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub dataset_sources: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub competition_sources: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub data: Option<serde_json::Value>,
 }
@@ -37,6 +52,40 @@ impl Metadata {
 
     pub fn dataset_slug(&self) -> Option<&str> {
         self.id.split('/').nth(1)
+    }
+
+    pub fn is_dataset_sources_valid(&self) -> Result<(), KaggleError> {
+        for s in &self.dataset_sources {
+            if s.split('/').count() < 2 {
+                return Err(KaggleError::meta(format!(
+                    "Invalid dataset source identifier. expected form `{{username}}/{{identifier-slug}}`, but got {}",
+                    s
+                ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn is_kernel_sources_valid(&self) -> Result<(), KaggleError> {
+        for s in &self.kernel_sources {
+            let mut split = s.split('/');
+            if let Some(item) = split.nth(1) {
+                if item.len() < 5 {
+                    return Err(KaggleError::meta(format!(
+                        "Kernel slug `{}` must be at least five characters.",
+                        s
+                    )));
+                }
+            } else {
+                return Err(KaggleError::meta(format!(
+                    "Invalid kernel source identifier. expected form `{{username}}/{{identifier-slug}}`, but got {}",
+                    s
+                ),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Validate resources is a wrapper to validate the existence of files and

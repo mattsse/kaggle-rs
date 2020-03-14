@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use serde_json::Value;
+use crate::query::{PushKernelType, PushLanguageType};
+use serde::Serialize;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KernelPushRequest {
     /// The kernel's ID number. One of `id` and `slug` are required. If both are
     /// specified, `id` will be preferred
@@ -13,49 +13,42 @@ pub struct KernelPushRequest {
     /// If both are specified, `id` will be preferred
     slug: Option<String>,
     /// The title to be set on the kernel
-    #[serde(rename = "newTitle")]
     new_title: Option<String>,
     /// The kernel's source code
     text: String,
     /// The language that the kernel is written in
-    language: String,
+    #[serde(with = "crate::none_as_empty")]
+    language: Option<PushLanguageType>,
     /// The type of kernel. Cannot be changed once the kernel has been created
-    #[serde(rename = "kernelType")]
-    kernel_type: String,
+    #[serde(with = "crate::none_as_empty")]
+    kernel_type: Option<PushKernelType>,
     /// Whether or not the kernel should be private
-    #[serde(rename = "isPrivate")]
     is_private: Option<bool>,
     /// Whether or not the kernel should run on a GPU
-    #[serde(rename = "enableGpu")]
     enable_gpu: Option<bool>,
     /// Whether or not the kernel should be able to access the internet
-    #[serde(rename = "enableInternet")]
     enable_internet: Option<bool>,
     /// A list of dataset data sources that the kernel should use. Each dataset
     /// is specified as `USERNAME/DATASET-SLUG`
-    #[serde(rename = "datasetDataSources")]
     dataset_data_sources: Option<Vec<String>>,
     /// A list of competition data sources that the kernel should use
-    #[serde(rename = "competitionDataSources")]
     competition_data_sources: Option<Vec<String>>,
     /// A list of kernel data sources that the kernel should use. Each dataset
     /// is specified as `USERNAME/KERNEL-SLUG`
-    #[serde(rename = "kernelDataSources")]
     kernel_data_sources: Option<Vec<String>>,
     /// A list of tag IDs to associated with the dataset
-    #[serde(rename = "categoryIds")]
     category_ids: Option<Vec<String>>,
 }
 
 impl KernelPushRequest {
-    pub fn new(text: String, language: String, kernel_type: String) -> Self {
+    pub fn new(text: String) -> Self {
         KernelPushRequest {
             id: None,
             slug: None,
             new_title: None,
             text,
-            language,
-            kernel_type,
+            language: None,
+            kernel_type: None,
             is_private: None,
             enable_gpu: None,
             enable_internet: None,
@@ -130,30 +123,30 @@ impl KernelPushRequest {
         &self.text
     }
 
-    pub fn set_language(&mut self, language: String) {
-        self.language = language;
+    pub fn set_language(&mut self, language: PushLanguageType) {
+        self.language = Some(language);
     }
 
-    pub fn with_language(mut self, language: String) -> KernelPushRequest {
-        self.language = language;
+    pub fn with_language(mut self, language: PushLanguageType) -> KernelPushRequest {
+        self.language = Some(language);
         self
     }
 
-    pub fn language(&self) -> &String {
-        &self.language
+    pub fn language(&self) -> Option<&PushLanguageType> {
+        self.language.as_ref()
     }
 
-    pub fn set_kernel_type(&mut self, kernel_type: String) {
-        self.kernel_type = kernel_type;
+    pub fn set_kernel_type(&mut self, kernel_type: PushKernelType) {
+        self.kernel_type = Some(kernel_type);
     }
 
-    pub fn with_kernel_type(mut self, kernel_type: String) -> KernelPushRequest {
-        self.kernel_type = kernel_type;
+    pub fn with_kernel_type(mut self, kernel_type: PushKernelType) -> KernelPushRequest {
+        self.kernel_type = Some(kernel_type);
         self
     }
 
-    pub fn kernel_type(&self) -> &String {
-        &self.kernel_type
+    pub fn kernel_type(&self) -> Option<&PushKernelType> {
+        self.kernel_type.as_ref()
     }
 
     pub fn set_is_private(&mut self, is_private: bool) {
