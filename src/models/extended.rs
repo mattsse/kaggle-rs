@@ -2,31 +2,58 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Competition {}
+pub struct Competition {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitResult {}
+pub struct SubmitResult {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Submission {}
+pub struct Submission {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LeaderboardEntry {}
+pub struct LeaderboardEntry {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dataset {}
+pub struct Dataset {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metadata {}
+pub struct Metadata {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatasetVersion {}
+pub struct DatasetVersion {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct File {}
+pub struct File {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tag {}
+pub struct Tag {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,16 +63,28 @@ pub struct FileUploadInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatasetNewVersionResponse {}
+pub struct DatasetNewVersionResponse {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatasetNewResponse {}
+pub struct DatasetNewResponse {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListFilesResult {}
+pub struct ListFilesResult {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Kernel {}
+pub struct Kernel {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KernelPushResponse {
