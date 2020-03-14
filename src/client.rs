@@ -27,6 +27,7 @@ use crate::models::extended::{
     File,
     FileUploadInfo,
     Kernel,
+    KernelPushResponse,
     LeaderboardEntry,
     ListFilesResult,
     Submission,
@@ -40,6 +41,7 @@ use crate::models::{
     DatasetUploadFile,
     KernelPushRequest,
 };
+use crate::query::{PushKernelType, PushLanguageType};
 use crate::request::{CompetitionsList, DatasetsList, KernelsList};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -330,12 +332,11 @@ impl KaggleApiClient {
                 return Ok((&self.credentials.user_name, user));
             }
         }
-        Err(KaggleError::Metadata {
-            msg: format!(
+        Err(KaggleError::meta( format!(
                 "Invalid identifier string. expected form `{{username}}/{{identifier-slug}}`, but got {}",
                 id
             ),
-        })
+        ))
     }
 
     async fn get<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
@@ -1165,13 +1166,19 @@ impl KaggleApiClient {
 
     /// read the metadata file and kernel files from a notebook, validate both,
     /// and use Kernel API to push to Kaggle if all is valid.
-    pub async fn kernels_push(&self, folder: impl AsRef<Path>) -> anyhow::Result<ApiResp> {
+    pub async fn kernels_push(
+        &self,
+        folder: impl AsRef<Path>,
+    ) -> anyhow::Result<KernelPushResponse> {
         let folder = folder.as_ref();
         let metadata = Self::read_kernel_metadata_file(folder).await?;
 
         if metadata.title.len() < 5 {
             Err(KaggleError::meta("Title must be at least five characters"))?
         }
+
+        let _ = metadata.is_dataset_sources_valid()?;
+        let _ = metadata.is_kernel_sources_valid()?;
 
         let code_path = metadata
             .code_file
@@ -1195,20 +1202,81 @@ impl KaggleApiClient {
             ))?
         }
 
-        if let Some(id_no) = metadata.id_no {
+        let script_body = tokio::fs::read(&code_file).await?;
+
+        let text = if Some(PushKernelType::Notebook) == metadata.kernel_type {
+            let mut json_body = serde_json::from_slice::<serde_json::Value>(&script_body)?;
+
+            // clean outputs
+            let obj = json_body
+                .as_object_mut()
+                .context("Expected json object in code file")?;
+            if let Some(cells) = obj.get_mut("cells").and_then(|x| x.as_array_mut()) {
+                for cell in cells {
+                    if let Some(cell_obj) = cell.as_object_mut() {
+                        if cell_obj.contains_key("outputs") {
+                            if Some("code") == cell_obj.get("cell_type").and_then(|x| x.as_str()) {
+                                cell_obj.insert(
+                                    "outputs".to_string(),
+                                    serde_json::Value::Array(vec![]),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            serde_json::to_string(&json_body)?
         } else {
+            String::from_utf8_lossy(&script_body).to_string()
+        };
+
+        let language = if Some(PushKernelType::Notebook) == metadata.kernel_type
+            && Some(PushLanguageType::Rmarkdown) == metadata.language
+        {
+            Some(PushLanguageType::R)
+        } else {
+            metadata.language
+        };
+
+        let mut req = KernelPushRequest::new(text)
+            .with_new_title(metadata.title)
+            .with_slug(metadata.id)
+            .with_dataset_data_sources(metadata.dataset_sources)
+            .with_competition_data_sources(metadata.competition_sources)
+            .with_kernel_data_sources(metadata.kernel_sources)
+            .with_category_ids(metadata.keywords);
+
+        if let Some(id_no) = metadata.id_no {
+            req.set_id(id_no);
+        }
+        if let Some(language) = language {
+            req.set_language(language);
+        }
+        if let Some(kernel) = metadata.kernel_type {
+            req.set_kernel_type(kernel);
+        }
+        if let Some(enable_gpu) = metadata.enable_gpu {
+            req.set_enable_gpu(enable_gpu);
+        }
+        if let Some(enable_internet) = metadata.enable_internet {
+            req.set_enable_internet(enable_internet);
+        }
+        if let Some(is_private) = metadata.is_private {
+            req.set_is_private(is_private);
         }
 
-        unimplemented!("Not implemented yet.")
+        Ok(self.kernel_push(&req).await?)
     }
 
     /// Push a new kernel version. Can be used to create a new kernel and update
     /// an existing one.
     pub async fn kernel_push(
         &self,
-        kernel_push_request: KernelPushRequest,
-    ) -> anyhow::Result<ApiResp> {
-        unimplemented!("Not implemented yet.")
+        kernel_push_request: &KernelPushRequest,
+    ) -> anyhow::Result<KernelPushResponse> {
+        Ok(self
+            .post_json(self.join_url("/kernels/push")?, Some(kernel_push_request))
+            .await?)
     }
 
     /// Get the status of a kernel.
