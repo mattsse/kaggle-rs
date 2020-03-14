@@ -27,6 +27,7 @@ use crate::models::extended::{
     File,
     FileUploadInfo,
     Kernel,
+    KernelOutput,
     KernelPushResponse,
     LeaderboardEntry,
     ListFilesResult,
@@ -1137,19 +1138,73 @@ impl KaggleApiClient {
     }
 
     /// Retrieve output for a specified kernel.
-    pub async fn kernel_output(&self, name: &str) -> anyhow::Result<ApiResp> {
+    pub async fn kernels_output(
+        &self,
+        name: &str,
+        path: Option<impl AsRef<Path>>,
+    ) -> anyhow::Result<Vec<PathBuf>> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
-        unimplemented!("Not implemented yet.")
+
+        let folder = if let Some(path) = path {
+            path.as_ref().to_path_buf()
+        } else {
+            self.download_dir
+                .join(format!("datasets/{}/{}/output", owner_slug, kernel_slug,))
+        };
+        fs::create_dir_all(&folder)?;
+
+        let resp = self.kernel_output(name).await?;
+
+        let mut outfiles = Vec::with_capacity(resp.files.len());
+
+        let mut outstream = stream::iter(resp.files.into_iter().map(|file| async {
+            let outfile = folder.join(file.file_name);
+            let content = file.url.content;
+            tokio::fs::write(&outfile, content).await?;
+            Ok::<_, std::io::Error>(outfile)
+        }))
+        .buffer_unordered(3);
+
+        while let Some(f) = outstream.next().await {
+            outfiles.push(f?);
+        }
+
+        if let Some(log) = resp.log {
+            let outfile = folder.join(format!("{}.log", kernel_slug));
+            tokio::fs::write(&outfile, log).await?;
+            outfiles.push(outfile);
+        }
+        Ok(outfiles)
+    }
+
+    /// RDownload the latest output from a kernel
+    pub async fn kernel_output(&self, name: &str) -> anyhow::Result<KernelOutput> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
+
+        if kernel_slug.len() < 5 {
+            Err(KaggleError::meta(format!(
+                "Kernel slug `{}` must be at least five characters.",
+                kernel_slug
+            )))?
+        }
+
+        Ok(self
+            .get_json(self.join_url(format!(
+                "/kernels/output?userName={}&kernelSlug={}",
+                owner_slug, kernel_slug
+            ))?)
+            .await?)
     }
 
     /// Pull the latest code from a kernel.
     pub async fn kernel_pull(&self, name: &str) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
-        Ok(Self::request_json(self.client.get(self.join_url(format!(
-            "/kernels/pull?userName={}&kernelSlug={}",
-            owner_slug, kernel_slug
-        ))?))
-        .await?)
+        Ok(self
+            .get_json(self.join_url(format!(
+                "/kernels/pull?userName={}&kernelSlug={}",
+                owner_slug, kernel_slug
+            ))?)
+            .await?)
     }
 
     /// Pull a kernel, including a metadata file (if metadata is True) and

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Competition {}
@@ -47,4 +48,26 @@ pub struct ListFilesResult {}
 pub struct Kernel {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KernelPushResponse {}
+pub struct KernelPushResponse {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KernelOutput {
+    #[serde(default)]
+    pub files: Vec<KernelOutputFile>,
+    pub log: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KernelOutputFile {
+    #[serde(rename = "fileName")]
+    pub file_name: String,
+    pub url: DownloadResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadResponse {
+    pub content: String,
+}

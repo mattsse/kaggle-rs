@@ -46,6 +46,27 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn is_valid_kernel_string(s: impl AsRef<str>) -> Result<(), KaggleError> {
+        let s = s.as_ref();
+        let mut split = s.split('/');
+        if let Some(kernel_slug) = split.nth(1) {
+            if kernel_slug.len() < 5 {
+                Err(KaggleError::meta(format!(
+                    "Kernel slug `{}` must be at least five characters.",
+                    kernel_slug
+                )))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(KaggleError::meta(format!(
+                "Invalid kernel source identifier. expected form `{{username}}/{{identifier-slug}}`, but got {}",
+                s
+            ),
+            ))
+        }
+    }
+
     pub fn owner_slug(&self) -> Option<&str> {
         self.id.split('/').next()
     }
@@ -69,21 +90,7 @@ impl Metadata {
 
     pub fn is_kernel_sources_valid(&self) -> Result<(), KaggleError> {
         for s in &self.kernel_sources {
-            let mut split = s.split('/');
-            if let Some(item) = split.nth(1) {
-                if item.len() < 5 {
-                    return Err(KaggleError::meta(format!(
-                        "Kernel slug `{}` must be at least five characters.",
-                        s
-                    )));
-                }
-            } else {
-                return Err(KaggleError::meta(format!(
-                    "Invalid kernel source identifier. expected form `{{username}}/{{identifier-slug}}`, but got {}",
-                    s
-                ),
-                ));
-            }
+            let _ = Self::is_valid_kernel_string(s)?;
         }
         Ok(())
     }
