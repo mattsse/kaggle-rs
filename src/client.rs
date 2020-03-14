@@ -44,7 +44,7 @@ use crate::models::{
     KernelPushRequest,
 };
 use crate::query::{PushKernelType, PushLanguageType};
-use crate::request::{CompetitionsList, DatasetsList, KernelsList};
+use crate::request::{CompetitionsList, DatasetsList, KernelPull, KernelsList};
 use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
@@ -1210,13 +1210,9 @@ impl KaggleApiClient {
 
     /// Pull a kernel, including a metadata file (if metadata is True) and
     /// associated files to a specified path.
-    pub async fn kernel_pull_write(
-        &self,
-        name: &str,
-        with_metadata: bool,
-        output: impl AsRef<Path>,
-    ) -> anyhow::Result<ApiResp> {
-        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn kernels_pull(&self, pull: KernelPull) -> anyhow::Result<ApiResp> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(&pull.name)?;
+
         unimplemented!()
     }
 

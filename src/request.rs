@@ -14,6 +14,7 @@ use crate::query::{
     OutputType,
     SortBy,
 };
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -283,6 +284,33 @@ impl DatasetsList {
 impl Default for DatasetsList {
     fn default() -> Self {
         Self::with_page(1)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct KernelPull {
+    pub with_metadata: bool,
+    pub name: String,
+    pub output: Option<PathBuf>,
+}
+
+impl KernelPull {
+    pub fn new(name: impl ToString) -> Self {
+        Self {
+            with_metadata: false,
+            name: name.to_string(),
+            output: None,
+        }
+    }
+
+    pub fn output(mut self, output: impl AsRef<Path>) -> Self {
+        self.output = Some(output.as_ref().to_path_buf());
+        self
+    }
+
+    pub fn with_metadata(mut self, with_metadata: bool) -> Self {
+        self.with_metadata = with_metadata;
+        self
     }
 }
 
