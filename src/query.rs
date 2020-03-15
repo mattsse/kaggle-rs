@@ -15,6 +15,7 @@ impl PushKernelType {
                 Language::R => Some(".r"),
                 Language::Sqlite => Some(".sqlite"),
                 Language::Julia => Some(".jl"),
+                Language::Rmarkdown => Some(".Rmd"),
                 _ => None,
             },
             PushKernelType::Notebook => match language {
@@ -35,7 +36,7 @@ pub enum PushLanguageType {
     Rmarkdown,
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum Language {
     All,
@@ -43,6 +44,7 @@ pub enum Language {
     R,
     Sqlite,
     Julia,
+    Rmarkdown,
 }
 
 impl Default for Language {

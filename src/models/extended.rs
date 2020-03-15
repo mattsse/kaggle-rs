@@ -1,3 +1,4 @@
+use crate::query::{KernelType, Language, PushKernelType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -82,6 +83,38 @@ pub struct ListFilesResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Kernel {
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KernelPullResponse {
+    pub blob: KernelBlob,
+    pub metadata: Metadata,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
+}
+
+impl KernelPullResponse {
+    pub fn code_file_extension(&self) -> Option<&'static str> {
+        self.blob.kernel_type.file_extension(&self.blob.language)
+    }
+
+    pub fn code_file_name(&self) -> Option<String> {
+        self.blob
+            .kernel_type
+            .file_extension(&self.blob.language)
+            .map(|ext| format!("{}{}", self.blob.slug, ext))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KernelBlob {
+    #[serde(rename = "kernelType")]
+    pub kernel_type: PushKernelType,
+    pub language: Language,
+    pub slug: String,
+    pub source: String,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }

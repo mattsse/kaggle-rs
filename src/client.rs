@@ -29,6 +29,7 @@ use crate::models::extended::{
     FileUploadInfo,
     Kernel,
     KernelOutput,
+    KernelPullResponse,
     KernelPushResponse,
     LeaderboardEntry,
     ListFilesResult,
@@ -44,7 +45,7 @@ use crate::models::{
     KernelPushRequest,
 };
 use crate::query::{PushKernelType, PushLanguageType};
-use crate::request::{CompetitionsList, DatasetsList, KernelPull, KernelsList};
+use crate::request::{CompetitionsList, DatasetsList, KernelPullRequest, KernelsList};
 use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
@@ -1198,7 +1199,7 @@ impl KaggleApiClient {
     }
 
     /// Pull the latest code from a kernel.
-    pub async fn kernel_pull(&self, name: &str) -> anyhow::Result<serde_json::Value> {
+    pub async fn kernel_pull(&self, name: &str) -> anyhow::Result<KernelPullResponse> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(self
             .get_json(self.join_url(format!(
@@ -1210,10 +1211,51 @@ impl KaggleApiClient {
 
     /// Pull a kernel, including a metadata file (if metadata is True) and
     /// associated files to a specified path.
-    pub async fn kernels_pull(&self, pull: KernelPull) -> anyhow::Result<ApiResp> {
+    pub async fn kernels_pull(
+        &self,
+        pull: KernelPullRequest,
+    ) -> anyhow::Result<(PathBuf, Option<PathBuf>)> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(&pull.name)?;
 
-        unimplemented!()
+        let resp = self.kernel_pull(&pull.name).await?;
+
+        let folder = pull.output.unwrap_or_else(|| {
+            self.download_dir
+                .join(format!("kernels/{}/{}", owner_slug, kernel_slug))
+        });
+        fs::create_dir_all(&folder)?;
+
+        let metadata_path = folder.join(Self::KERNEL_METADATA_FILE);
+
+        let file_name = if metadata_path.exists() {
+            let existing_meta = Self::read_kernel_metadata_file(&metadata_path).await?;
+            if Some("INSERT_CODE_FILE_PATH_HERE")
+                == existing_meta.code_file.as_ref().map(String::as_str)
+            {
+                None
+            } else {
+                existing_meta.code_file.clone()
+            }
+        } else {
+            resp.code_file_name()
+        }
+        .unwrap_or_else(|| "script.py".to_string());
+
+        let output = folder.join(file_name);
+
+        tokio::fs::write(&output, resp.blob.source).await?;
+
+        if pull.with_metadata {
+            tokio::fs::write(
+                &metadata_path,
+                serde_json::to_string_pretty(&resp.metadata)?,
+            )
+            .await?;
+
+            Ok((output, Some(metadata_path)))
+        } else {
+            Ok((output, None))
+        }
     }
 
     /// read the metadata file and kernel files from a notebook, validate both,

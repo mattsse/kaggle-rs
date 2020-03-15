@@ -288,13 +288,13 @@ impl Default for DatasetsList {
 }
 
 #[derive(Debug, Clone)]
-pub struct KernelPull {
+pub struct KernelPullRequest {
     pub with_metadata: bool,
     pub name: String,
     pub output: Option<PathBuf>,
 }
 
-impl KernelPull {
+impl KernelPullRequest {
     pub fn new(name: impl ToString) -> Self {
         Self {
             with_metadata: false,
