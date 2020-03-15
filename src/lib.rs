@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod archive;
 pub mod client;
 mod error;

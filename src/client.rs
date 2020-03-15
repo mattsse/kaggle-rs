@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::fmt;
 use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
@@ -85,8 +85,6 @@ pub struct KaggleApiClient {
 }
 
 impl KaggleApiClient {
-    const HEADER_API_VERSION: &'static str = "X-Kaggle-ApiVersion";
-
     const DATASET_METADATA_FILE: &'static str = "dataset-metadata.json";
 
     const OLD_DATASET_METADATA_FILE: &'static str = "datapackage.json";
@@ -340,10 +338,6 @@ impl KaggleApiClient {
                 id
             ),
         ))
-    }
-
-    async fn get<U: IntoUrl>(&self, url: U) -> anyhow::Result<String> {
-        Ok(Self::request(self.client.get(url)).await?.text().await?)
     }
 
     async fn post_json<T: DeserializeOwned, U: IntoUrl, B: Serialize + ?Sized>(
@@ -1286,7 +1280,7 @@ impl KaggleApiClient {
             )))?
         }
 
-        let (owner_slug, kernel_slug) = self
+        let (_owner_slug, kernel_slug) = self
             .get_user_and_identifier_slug(&metadata.id)
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 

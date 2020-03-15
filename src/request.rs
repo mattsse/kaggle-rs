@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize, Serializer};
+use serde::Serialize;
 
-use crate::models::extended::Tag;
 use crate::query::{
     CompetitionCategory,
     CompetitionGroup,

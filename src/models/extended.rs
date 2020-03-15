@@ -1,4 +1,4 @@
-use crate::query::{KernelType, Language, PushKernelType};
+use crate::query::{Language, PushKernelType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

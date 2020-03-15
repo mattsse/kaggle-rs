@@ -12,8 +12,8 @@ impl ArchiveMode {
     /// Create either a tar or zip file of the provided source path
     pub fn make_archive(
         &self,
-        src: impl AsRef<Path>,
-        to: impl AsRef<Path>,
+        _src: impl AsRef<Path>,
+        _to: impl AsRef<Path>,
     ) -> anyhow::Result<Option<PathBuf>> {
         // TODO implement
         match self {

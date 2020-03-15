@@ -1,6 +1,6 @@
 use crate::error::KaggleError;
 use crate::models::{Collaborator, DatasetColumn, DatasetUpdateSettingsRequest, License};
-use crate::query::{Language, PushKernelType, PushLanguageType};
+use crate::query::{PushKernelType, PushLanguageType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
