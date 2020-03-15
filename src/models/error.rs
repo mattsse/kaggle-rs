@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use serde_json::Value;
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Error {
@@ -43,5 +42,24 @@ impl Error {
 
     pub fn reset_message(&mut self) {
         self.message = None;
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Kaggle Api Server Error")?;
+        if let Some(code) = self.code {
+            write!(f, ": code: {}", code)?;
+            if let Some(msg) = &self.message {
+                write!(f, ", message: {}", msg)?;
+            }
+        } else {
+            if let Some(msg) = &self.message {
+                write!(f, ": message: {}", msg)?;
+            }
+        }
+        Ok(())
     }
 }

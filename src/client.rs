@@ -1,5 +1,4 @@
 use std::convert::TryInto;
-use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -19,7 +18,7 @@ use walkdir::WalkDir;
 use anyhow::{anyhow, Context};
 
 use crate::archive::ArchiveMode;
-use crate::error::KaggleError;
+use crate::error::{ApiError, KaggleError};
 use crate::models::extended::{
     Competition,
     Dataset,
@@ -49,32 +48,6 @@ use crate::request::{CompetitionsList, DatasetsList, KernelPullRequest, KernelsL
 use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
-
-/// Describes API errors
-#[derive(Debug)]
-pub enum ApiError {
-    Unauthorized,
-    RateLimited(Option<usize>),
-    Other(u16),
-}
-
-impl std::error::Error for ApiError {}
-
-impl fmt::Display for ApiError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ApiError::Unauthorized => write!(f, "Unauthorized request to API"),
-            ApiError::RateLimited(e) => {
-                if let Some(d) = e {
-                    write!(f, "Exceeded API request limit - please wait {} seconds", d)
-                } else {
-                    write!(f, "Exceeded API request limit")
-                }
-            }
-            ApiError::Other(s) => write!(f, "Kaggle API reported error code {}", s),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct KaggleApiClient {
@@ -375,7 +348,7 @@ impl KaggleApiClient {
                 }
                 status => ApiError::Other(status.as_u16()),
             };
-            Err(err.into())
+            Err(KaggleError::Api { err }.into())
         }
     }
 
