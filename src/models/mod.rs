@@ -7,7 +7,6 @@ pub use self::dataset_upload_file::DatasetUploadFile;
 pub use self::error::Error;
 pub use self::kernel_push_request::KernelPushRequest;
 pub use self::license::License;
-pub use self::result::Result;
 
 mod collaborator;
 mod dataset_column;
@@ -20,4 +19,3 @@ pub mod extended;
 mod kernel_push_request;
 mod license;
 pub mod metadata;
-mod result;

@@ -90,7 +90,7 @@ impl Metadata {
 
     pub fn is_kernel_sources_valid(&self) -> Result<(), KaggleError> {
         for s in &self.kernel_sources {
-            let _ = Self::is_valid_kernel_string(s)?;
+            Self::is_valid_kernel_string(s)?;
         }
         Ok(())
     }

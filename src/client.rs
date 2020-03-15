@@ -114,12 +114,6 @@ pub struct KaggleApiClientBuilder {
 }
 
 impl KaggleApiClientBuilder {
-    fn default_headers() -> HeaderMap {
-        let headers = HeaderMap::with_capacity(3);
-        // TODO do i need this at all?
-        headers
-    }
-
     pub fn headers(mut self, headers: HeaderMap) -> Self {
         self.headers = Some(headers);
         self
@@ -132,7 +126,7 @@ impl KaggleApiClientBuilder {
 
     pub fn headers_mut(&mut self) -> &mut HeaderMap {
         if self.headers.is_none() {
-            self.headers = Some(Self::default_headers());
+            self.headers = Some(HeaderMap::with_capacity(2));
         }
         self.headers.as_mut().unwrap()
     }
@@ -155,10 +149,10 @@ impl KaggleApiClientBuilder {
     pub fn build(self) -> anyhow::Result<KaggleApiClient> {
         let credentials = self
             .auth
-            .unwrap_or_else(|| Authentication::default())
+            .unwrap_or_else(Authentication::default)
             .credentials()?;
 
-        let mut headers = self.headers.unwrap_or_else(|| Self::default_headers());
+        let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(2));
 
         let mut header_value = b"Basic ".to_vec();
         {
@@ -381,7 +375,7 @@ impl KaggleApiClient {
                 }
                 status => ApiError::Other(status.as_u16()),
             };
-            Err(err)?
+            Err(err.into())
         }
     }
 
@@ -420,17 +414,15 @@ impl KaggleApiClient {
                 if old.exists() {
                     Ok(old)
                 } else {
-                    Err(KaggleError::FileNotFound(file))?
+                    Err(KaggleError::FileNotFound(file).into())
                 }
             } else {
                 Ok(file)
             }
+        } else if path.exists() {
+            Ok(path)
         } else {
-            if path.exists() {
-                Ok(path)
-            } else {
-                Err(KaggleError::FileNotFound(path))?
-            }
+            Err(KaggleError::FileNotFound(path).into())
         }
     }
 
@@ -441,14 +433,12 @@ impl KaggleApiClient {
             if file.exists() {
                 Ok(file)
             } else {
-                Err(KaggleError::FileNotFound(file))?
+                Err(KaggleError::FileNotFound(file).into())
             }
+        } else if path.exists() {
+            Ok(path)
         } else {
-            if path.exists() {
-                Ok(path)
-            } else {
-                Err(KaggleError::FileNotFound(path))?
-            }
+            Err(KaggleError::FileNotFound(path).into())
         }
     }
 
@@ -479,7 +469,7 @@ impl KaggleApiClient {
             .await?;
 
         // complete the upload to retrieve a path from the url parameter
-        let _ = self.upload_complete(file, &info.create_url).await?;
+        self.upload_complete(file, &info.create_url).await?;
 
         let mut upload_file = DatasetUploadFile::new(info.token);
         if let Some(item) = item {
@@ -852,36 +842,39 @@ impl KaggleApiClient {
 
         // validate
         if dataset_slug == "INSERT_SLUG_HERE" {
-            Err(KaggleError::meta(
+            return Err(KaggleError::meta(
                 "Default slug detected, please change values before uploading",
-            ))?
+            )
+            .into());
         }
         if metadata.title == "INSERT_SLUG_HERE" {
-            Err(KaggleError::meta(
+            return Err(KaggleError::meta(
                 "Default title detected, please change values before uploading",
-            ))?
+            )
+            .into());
         }
         if metadata.licenses.len() != 1 {
-            Err(KaggleError::meta("Please specify exactly one license"))?
+            return Err(KaggleError::meta("Please specify exactly one license").into());
         }
         if dataset_slug.len() < 6 || dataset_slug.len() > 50 {
-            Err(KaggleError::meta(
-                "The dataset slug must be between 6 and 50 characters",
-            ))?
+            return Err(
+                KaggleError::meta("The dataset slug must be between 6 and 50 characters").into(),
+            );
         }
         if metadata.title.len() < 6 || metadata.title.len() > 50 {
-            Err(KaggleError::meta(
-                "The dataset title must be between 6 and 50 characters",
-            ))?
+            return Err(
+                KaggleError::meta("The dataset title must be between 6 and 50 characters").into(),
+            );
         }
-        let _ = metadata.validate_resource(folder)?;
+        metadata.validate_resource(folder)?;
 
         let mut request = DatasetNewRequest::builder(metadata.title);
         if let Some(subtitle) = &metadata.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
-                Err(KaggleError::meta(
+                return Err(KaggleError::meta(
                     "Subtitle length must be between 20 and 80 characters",
-                ))?
+                )
+                .into());
             }
             request = request.subtitle(subtitle);
         }
@@ -925,15 +918,16 @@ impl KaggleApiClient {
     ) -> anyhow::Result<DatasetNewVersionResponse> {
         let folder = folder.as_ref();
         let meta_data = Self::read_dataset_metadata_file(folder).await?;
-        let _ = meta_data.validate_resource(folder)?;
+        meta_data.validate_resource(folder)?;
 
         let mut req = DatasetNewVersionRequest::new(version_notes.to_string());
 
         if let Some(subtitle) = meta_data.subtitle {
             if subtitle.len() < 20 || subtitle.len() > 80 {
-                Err(KaggleError::Metadata {
+                return Err(KaggleError::Metadata {
                     msg: "Subtitle length must be between 20 and 80 characters".to_string(),
-                })?
+                }
+                .into());
             }
             req.set_subtitle(subtitle);
         }
@@ -952,9 +946,10 @@ impl KaggleApiClient {
             Ok(self.datasets_create_version_by_id(id_no, &req).await?)
         } else {
             if meta_data.id == format!("{}/INSERT_SLUG_HERE", self.credentials.user_name) {
-                Err(KaggleError::Metadata {
+                return Err(KaggleError::Metadata {
                     msg: "Default slug detected, please change values before uploading".to_string(),
-                })?
+                }
+                .into());
             }
             Ok(self.datasets_create_version(&meta_data.id, &req).await?)
         }
@@ -1178,10 +1173,11 @@ impl KaggleApiClient {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
 
         if kernel_slug.len() < 5 {
-            Err(KaggleError::meta(format!(
+            return Err(KaggleError::meta(format!(
                 "Kernel slug `{}` must be at least five characters.",
                 kernel_slug
-            )))?
+            ))
+            .into());
         }
 
         Ok(self
@@ -1223,12 +1219,10 @@ impl KaggleApiClient {
 
         let file_name = if metadata_path.exists() {
             let existing_meta = Self::read_kernel_metadata_file(&metadata_path).await?;
-            if Some("INSERT_CODE_FILE_PATH_HERE")
-                == existing_meta.code_file.as_ref().map(String::as_str)
-            {
+            if Some("INSERT_CODE_FILE_PATH_HERE") == existing_meta.code_file.as_deref() {
                 None
             } else {
-                existing_meta.code_file.clone()
+                existing_meta.code_file
             }
         } else {
             resp.code_file_name()
@@ -1262,11 +1256,11 @@ impl KaggleApiClient {
         let metadata = Self::read_kernel_metadata_file(folder).await?;
 
         if metadata.title.len() < 5 {
-            Err(KaggleError::meta("Title must be at least five characters"))?
+            return Err(KaggleError::meta("Title must be at least five characters").into());
         }
 
-        let _ = metadata.is_dataset_sources_valid()?;
-        let _ = metadata.is_kernel_sources_valid()?;
+        metadata.is_dataset_sources_valid()?;
+        metadata.is_kernel_sources_valid()?;
 
         let code_path = metadata
             .code_file
@@ -1274,10 +1268,11 @@ impl KaggleApiClient {
 
         let code_file = folder.join(code_path);
         if !code_file.is_file() && !code_file.exists() {
-            Err(KaggleError::meta(format!(
+            return Err(KaggleError::meta(format!(
                 "Source file not found:{}",
                 code_file.display()
-            )))?
+            ))
+            .into());
         }
 
         let (_owner_slug, kernel_slug) = self
@@ -1285,9 +1280,9 @@ impl KaggleApiClient {
             .map(|(s1, s2)| (s1.to_string(), s2.to_string()))?;
 
         if kernel_slug.to_lowercase() != slug::slugify(&metadata.title) {
-            Err(KaggleError::meta(
-                "kernel title does not resolve to the specified id",
-            ))?
+            return Err(
+                KaggleError::meta("kernel title does not resolve to the specified id").into(),
+            );
         }
 
         let script_body = tokio::fs::read(&code_file).await?;
@@ -1302,13 +1297,11 @@ impl KaggleApiClient {
             if let Some(cells) = obj.get_mut("cells").and_then(|x| x.as_array_mut()) {
                 for cell in cells {
                     if let Some(cell_obj) = cell.as_object_mut() {
-                        if cell_obj.contains_key("outputs") {
-                            if Some("code") == cell_obj.get("cell_type").and_then(|x| x.as_str()) {
-                                cell_obj.insert(
-                                    "outputs".to_string(),
-                                    serde_json::Value::Array(vec![]),
-                                );
-                            }
+                        if cell_obj.contains_key("outputs")
+                            && Some("code") == cell_obj.get("cell_type").and_then(|x| x.as_str())
+                        {
+                            cell_obj
+                                .insert("outputs".to_string(), serde_json::Value::Array(vec![]));
                         }
                     }
                 }
