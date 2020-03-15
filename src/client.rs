@@ -49,11 +49,25 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
 
+/// Client to interact with the kaggle api.
+///
+/// # Example
+///
+/// ```
+/// # use kaggle::{KaggleApiClient, Authentication};
+/// ```
 #[derive(Clone)]
 pub struct KaggleApiClient {
+    /// The client that executes the http requests
     client: Rc<reqwest::Client>,
+
+    /// Base url to the kaggle api, `https://www.kaggle.com/api/v1`
     base_url: Url,
+
+    /// Basic Auth credentials to authenticate the requests
     credentials: KaggleCredentials,
+
+    /// Default location to store downloads
     download_dir: PathBuf,
 }
 
@@ -228,26 +242,38 @@ impl KaggleCredentials {
     }
 }
 
+/// Used to declare the credentials to use for authentication.
+///
+/// Default is the kaggle.json config file.
 #[derive(Debug, Clone)]
 pub enum Authentication {
     /// Get the credentials from `KAGGLE_USERNAME` and `KAGGLE_KEY` env
     /// variables.
     Env,
-    ConfigFile {
-        /// Where the `kaggle.json` file is stored.
-        /// Default location is `~/.kaggle/kaggle.json` and on windows
-        /// `C:\Users\<Windows-username>\.kaggle\kaggle.json`
-        path: Option<PathBuf>,
-    },
+
+    /// Where the `kaggle.json` file is stored.
+    ///
+    /// Default location is `~/.kaggle/kaggle.json` and on windows
+    /// `C:\Users\<Windows-username>\.kaggle\kaggle.json`
+    ConfigFile { path: Option<PathBuf> },
+
     /// Use dedicated credentials for authentication.
     Credentials { user_name: String, key: String },
 }
 
 impl Authentication {
+    /// Use dedicated credentials.
     pub fn with_credentials<S: ToString, T: ToString>(user_name: S, key: T) -> Self {
         Authentication::Credentials {
             user_name: user_name.to_string(),
             key: key.to_string(),
+        }
+    }
+
+    /// Use credentials from a dedicated location.
+    pub fn with_config_file(path: impl AsRef<Path>) -> Self {
+        Authentication::ConfigFile {
+            path: Some(path.as_ref().to_path_buf()),
         }
     }
 }
@@ -284,7 +310,7 @@ impl KaggleApiClient {
         Ok(self.base_url.join(path.as_ref())?)
     }
 
-    /// determine if a dataset string is valid, meaning it is in the format of
+    /// Determine if a dataset string is valid, meaning it is in the format of
     /// {username}/{identifier-slug}
     pub fn get_user_and_identifier_slug<'a>(
         &'a self,
