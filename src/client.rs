@@ -49,6 +49,8 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
 
+use log::{debug, info};
+
 /// Client to interact with the kaggle api.
 ///
 /// # Example
@@ -146,7 +148,7 @@ impl KaggleApiClientBuilder {
             // See [`reqwest::Request`]
             let mut encoder =
                 base64::write::EncoderWriter::new(&mut header_value, base64::STANDARD);
-            write!(encoder, "{}:", &credentials.user_name)?;
+            write!(encoder, "{}:", &credentials.username)?;
             write!(encoder, "{}", &credentials.key)?;
         }
 
@@ -204,7 +206,7 @@ impl Default for KaggleApiClientBuilder {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct KaggleCredentials {
-    user_name: String,
+    username: String,
     key: String,
 }
 
@@ -213,7 +215,10 @@ impl KaggleCredentials {
         let user_name = std::env::var("KAGGLE_USERNAME")
             .context("KAGGLE_USERNAME env variable not present.")?;
         let key = std::env::var("KAGGLE_KEY").context("KAGGLE_KEY env variable not present.")?;
-        Ok(KaggleCredentials { user_name, key })
+        Ok(KaggleCredentials {
+            username: user_name,
+            key,
+        })
     }
 
     fn from_default_json() -> anyhow::Result<Self> {
@@ -289,9 +294,10 @@ impl Authentication {
                     KaggleCredentials::from_default_json()
                 }
             }
-            Authentication::Credentials { user_name, key } => {
-                Ok(KaggleCredentials { user_name, key })
-            }
+            Authentication::Credentials { user_name, key } => Ok(KaggleCredentials {
+                username: user_name,
+                key,
+            }),
         }
     }
 }
@@ -323,7 +329,7 @@ impl KaggleApiClient {
                     return Ok((user, ident));
                 }
             } else {
-                return Ok((&self.credentials.user_name, user));
+                return Ok((&self.credentials.username, user));
             }
         }
         Err(KaggleError::meta( format!(
@@ -349,10 +355,13 @@ impl KaggleApiClient {
     }
 
     async fn get_json<T: DeserializeOwned, U: IntoUrl>(&self, url: U) -> anyhow::Result<T> {
+        let url = url.into_url()?;
+        debug!("GET: {}", url);
         Ok(Self::request_json(self.client.get(url)).await?)
     }
 
     async fn request_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> anyhow::Result<T> {
+        println!("Request: {:?}", req);
         let full = Self::request(req).await?.bytes().await?;
         match serde_json::from_slice::<T>(&full) {
             Ok(resp) => Ok(resp),
@@ -957,7 +966,7 @@ impl KaggleApiClient {
         if let Some(id_no) = meta_data.id_no {
             Ok(self.datasets_create_version_by_id(id_no, &req).await?)
         } else {
-            if meta_data.id == format!("{}/INSERT_SLUG_HERE", self.credentials.user_name) {
+            if meta_data.id == format!("{}/INSERT_SLUG_HERE", self.credentials.username) {
                 return Err(KaggleError::Metadata {
                     msg: "Default slug detected, please change values before uploading".to_string(),
                 }

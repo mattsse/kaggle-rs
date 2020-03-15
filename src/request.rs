@@ -20,18 +20,18 @@ use std::path::{Path, PathBuf};
 pub struct CompetitionsList {
     /// Group to filter result to
     #[serde(with = "crate::none_as_empty")]
-    pub group: Option<CompetitionGroup>,
+    group: Option<CompetitionGroup>,
     /// Category to filter result to
     #[serde(with = "crate::none_as_empty")]
-    pub category: Option<CompetitionCategory>,
+    category: Option<CompetitionCategory>,
     /// How to sort the result
     #[serde(with = "crate::none_as_empty")]
-    pub sort_by: Option<CompetitionSortBy>,
+    sort_by: Option<CompetitionSortBy>,
     /// The page to return.
-    pub page: usize,
+    page: usize,
     /// Search term to use (default is empty string)
     #[serde(with = "crate::none_as_empty")]
-    pub search: Option<String>,
+    search: Option<String>,
 }
 
 impl CompetitionsList {
@@ -56,34 +56,34 @@ impl Default for CompetitionsList {
 #[serde(rename_all = "camelCase")]
 pub struct KernelsList {
     /// The page to return.
-    pub page: usize,
+    page: usize,
     /// Results per page, defaults to 20
-    pub page_size: usize,
+    page_size: usize,
     /// Filter to this dataset
     #[serde(with = "crate::none_as_empty")]
-    pub dataset: Option<String>,
+    dataset: Option<String>,
     /// Filter to this competition
     #[serde(with = "crate::none_as_empty")]
-    pub competition: Option<String>,
+    competition: Option<String>,
     /// Filter to those with specified parent
     #[serde(with = "crate::none_as_empty")]
-    pub parent_kernel: Option<String>,
+    parent_kernel: Option<String>,
     /// A custom search string to pass to the list query
     #[serde(with = "crate::none_as_empty")]
-    pub search: Option<String>,
+    search: Option<String>,
     /// whit kind of kernels to return
-    pub group: Group,
+    group: Group,
     /// Filter results to a specific user
     #[serde(with = "crate::none_as_empty")]
-    pub user: Option<String>,
+    user: Option<String>,
     /// The programming language of the kernel
-    pub language: Language,
+    language: Language,
     /// The type of kernel
-    pub kernel_type: KernelType,
+    kernel_type: KernelType,
     /// The output type
-    pub output_type: OutputType,
+    output_type: OutputType,
     /// Sort results by this string
-    pub sort_by: SortBy,
+    sort_by: SortBy,
 }
 
 impl Default for KernelsList {
@@ -173,32 +173,31 @@ impl KernelsList {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetsList {
-    /// How to sort the result, see valid_dataset_sort_bys for options
-    #[serde(with = "crate::none_as_empty")]
-    pub sort_by: Option<SortBy>,
-    /// The format, see valid_dataset_file_types for string options
-    #[serde(with = "crate::none_as_empty")]
-    pub filetype: Option<DatasetFileType>,
-    /// Tag identifiers to filter the search
-    pub tagids: Option<String>,
-    /// Descriptor for the license
-    pub license: Option<DatasetLicenseName>,
-    /// Search term to use (default is empty string)
-    #[serde(with = "crate::none_as_empty")]
-    pub search: Option<String>,
-    /// Display datasets by a specific user or organization
-    #[serde(with = "crate::none_as_empty")]
-    pub user: Option<String>,
-    /// The page to return.
-    pub page: usize,
-    /// The maximum size of the dataset to return
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_size: Option<usize>,
-    /// The minimum size of the dataset to return
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_size: Option<usize>,
     /// Display datasets by a particular group
     group: DatasetGroup,
+    /// How to sort the result, see valid_dataset_sort_bys for options
+    sort_by: SortBy,
+    /// The format, see valid_dataset_file_types for string options
+    filetype: DatasetFileType,
+    /// Tag identifiers to filter the search
+    #[serde(with = "crate::none_as_empty")]
+    tagids: Option<String>,
+    /// Descriptor for the license
+    license: DatasetLicenseName,
+    /// Search term to use (default is empty string)
+    #[serde(with = "crate::none_as_empty")]
+    search: Option<String>,
+    /// Display datasets by a specific user or organization
+    #[serde(with = "crate::none_as_empty")]
+    user: Option<String>,
+    /// The page to return.
+    page: usize,
+    /// The maximum size of the dataset to return
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_size: Option<usize>,
+    /// The minimum size of the dataset to return
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_size: Option<usize>,
 }
 
 impl DatasetsList {
@@ -209,10 +208,10 @@ impl DatasetsList {
     pub fn with_page(page: usize) -> Self {
         Self {
             page,
-            sort_by: None,
-            filetype: None,
+            sort_by: SortBy::Hotness,
+            filetype: DatasetFileType::All,
             tagids: None,
-            license: None,
+            license: DatasetLicenseName::All,
             search: None,
             user: None,
             max_size: None,
@@ -237,7 +236,7 @@ impl DatasetsList {
     }
 
     pub fn file_type(mut self, file_type: DatasetFileType) -> Self {
-        self.filetype = Some(file_type);
+        self.filetype = file_type;
         self
     }
 
@@ -265,12 +264,12 @@ impl DatasetsList {
     }
 
     pub fn license_name(mut self, license_name: DatasetLicenseName) -> Self {
-        self.license = Some(license_name);
+        self.license = license_name;
         self
     }
 
     pub fn sort_by(mut self, sort_by: SortBy) -> Self {
-        self.sort_by = Some(sort_by);
+        self.sort_by = sort_by;
         self
     }
 
