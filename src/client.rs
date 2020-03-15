@@ -327,7 +327,20 @@ impl KaggleApiClient {
     }
 
     async fn request_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> anyhow::Result<T> {
-        Ok(Self::request(req).await?.json::<T>().await?)
+        let full = Self::request(req).await?.bytes().await?;
+        match serde_json::from_slice::<T>(&full) {
+            Ok(resp) => Ok(resp),
+            Err(err) => {
+                if let Ok(api_err) = serde_json::from_slice::<crate::models::Error>(&full) {
+                    Err(KaggleError::Api {
+                        err: ApiError::ServerError(api_err),
+                    }
+                    .into())
+                } else {
+                    Err(err.into())
+                }
+            }
+        }
     }
 
     /// Execute the request.
