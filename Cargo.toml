@@ -18,7 +18,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 base64 = "0.11"
 futures = "0.3"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.10", features = ["json", "stream"] }
 tempdir = "0.3"
 anyhow = "1.0"
@@ -32,3 +32,8 @@ tar = "0.4"
 walkdir = "2.3"
 slug = "0.1"
 log = "0.4.8"
+flate2 = "1.0.13"
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["macros"] }
+

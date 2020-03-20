@@ -49,7 +49,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use tempdir::TempDir;
 
-use log::{debug, info};
+use log::debug;
 
 /// Client to interact with the kaggle api.
 ///
