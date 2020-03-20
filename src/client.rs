@@ -599,6 +599,27 @@ impl KaggleApiClient {
     ///
     /// If [`output`] is `None`, then the destination is
     /// `<self.download_dir>/<id>-leaderboard.zip`
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kaggle::query::CompetitionSortBy;
+    /// # use kaggle::request::CompetitionsList;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .competitions_list(
+    ///             &CompetitionsList::default()
+    ///                 .sort_by(CompetitionSortBy::RecentlyCreated)
+    ///                 .search("health"),
+    ///         )
+    ///         .await?;
+    /// #    Ok(())
+    /// # }
+    /// ```
     pub async fn competition_download_leaderboard(
         &self,
         id: impl AsRef<str>,
@@ -627,6 +648,20 @@ impl KaggleApiClient {
     }
 
     /// View a leaderboard based on a competition name
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kaggle::KaggleApiClient;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .competition_view_leaderboard("digit-recognizer")
+    ///         .await?;
+    /// #    Ok(())
+    /// # }
+    /// ```
     pub async fn competition_view_leaderboard(
         &self,
         id: impl AsRef<str>,
@@ -1111,6 +1146,28 @@ impl KaggleApiClient {
         Ok(Self::download_file(resp, outfile).await?)
     }
 
+    /// List datasets
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use kaggle::request::DatasetsList;
+    /// # use kaggle::KaggleApiClient;
+    /// # use kaggle::query::SortBy;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .datasets_list(
+    ///             &DatasetsList::default()
+    ///                 .sort_by(SortBy::ViewCount)
+    ///                 .search("corona"),
+    ///         )
+    ///         .await?;
+    /// #    Ok(())
+    /// # }
+    /// ```
     pub async fn datasets_list(&self, list: &DatasetsList) -> anyhow::Result<Vec<Dataset>> {
         Ok(
             Self::request_json(self.client.get(self.join_url("datasets/list")?).query(list))
