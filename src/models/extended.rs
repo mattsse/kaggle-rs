@@ -44,15 +44,18 @@ pub struct SubmitResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Submission {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    pub team_id: i64,
+    pub team_name: String,
+    #[serde(with = "crate::models::extended::date_serializer")]
+    pub submission_date: NaiveDateTime,
+    pub score: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LeaderboardEntry {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+pub struct LeaderBoard {
+    pub submissions: Vec<Submission>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

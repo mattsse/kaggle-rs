@@ -30,7 +30,7 @@ use crate::models::extended::{
     KernelOutput,
     KernelPullResponse,
     KernelPushResponse,
-    LeaderboardEntry,
+    LeaderBoard,
     ListFilesResult,
     Submission,
     SubmitResult,
@@ -588,21 +588,37 @@ impl KaggleApiClient {
         .await?)
     }
 
-    /// Download competition leaderboard
-    pub async fn competition_download_leaderboard<T: AsRef<Path>>(
+    /// Download competition leaderboard as zip file, as zip containing a csv of
+    /// [`KaggleApiClient::competition_view_leaderboard`].
+    ///
+    /// If [`output`] is a directory then the destination of the leaderboard zip
+    /// file will be `<output>/<id>-leaderboard.zip`.
+    ///
+    /// If [`output`] is a file then this is the destination of downloaded
+    /// leaderboard zip.
+    ///
+    /// If [`output`] is `None`, then the destination is
+    /// `<self.download_dir>/<id>-leaderboard.zip`
+    pub async fn competition_download_leaderboard(
         &self,
-        id: &str,
-        target: Option<T>,
+        id: impl AsRef<str>,
+        output: Option<impl AsRef<Path>>,
     ) -> anyhow::Result<PathBuf> {
-        let output = if let Some(target) = target {
-            target.as_ref().to_path_buf()
+        let id = id.as_ref();
+        let output = if let Some(target) = output {
+            let target = target.as_ref();
+            if target.is_dir() {
+                target.join(format!("{}-leaderboard.zip", id))
+            } else {
+                target.to_path_buf()
+            }
         } else {
             self.download_dir.join(format!("{}-leaderboard.zip", id))
         };
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("/competitions/{}/leaderboard/download", id))?)
+                .get(self.join_url(format!("competitions/{}/leaderboard/download", id))?)
                 .send()
                 .await?,
             output,
@@ -613,11 +629,11 @@ impl KaggleApiClient {
     /// View a leaderboard based on a competition name
     pub async fn competition_view_leaderboard(
         &self,
-        id: &str,
-    ) -> anyhow::Result<Vec<LeaderboardEntry>> {
+        id: impl AsRef<str>,
+    ) -> anyhow::Result<LeaderBoard> {
         Ok(Self::request_json(
             self.client
-                .get(self.join_url(format!("/competitions/{}/leaderboard/view", id))?),
+                .get(self.join_url(format!("competitions/{}/leaderboard/view", id.as_ref()))?),
         )
         .await?)
     }
