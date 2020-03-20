@@ -194,7 +194,7 @@ impl KaggleApiClientBuilder {
 impl Default for KaggleApiClientBuilder {
     fn default() -> Self {
         Self {
-            base_url: "https://www.kaggle.com/api/v1".parse().unwrap(),
+            base_url: "https://www.kaggle.com/api/v1/".parse().unwrap(),
             user_agent: None,
             client: None,
             headers: None,
