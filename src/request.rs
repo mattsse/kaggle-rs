@@ -44,6 +44,26 @@ impl CompetitionsList {
             search: None,
         }
     }
+
+    pub fn group(mut self, group: CompetitionGroup) -> Self {
+        self.group = Some(group);
+        self
+    }
+
+    pub fn category(mut self, category: CompetitionCategory) -> Self {
+        self.category = Some(category);
+        self
+    }
+
+    pub fn sort_by(mut self, sort_by: CompetitionSortBy) -> Self {
+        self.sort_by = Some(sort_by);
+        self
+    }
+
+    pub fn search(mut self, search: impl ToString) -> Self {
+        self.search = Some(search.to_string());
+        self
+    }
 }
 
 impl Default for CompetitionsList {
@@ -201,10 +221,6 @@ pub struct DatasetsList {
 }
 
 impl DatasetsList {
-    pub fn builder() -> Self {
-        Self::default()
-    }
-
     pub fn with_page(page: usize) -> Self {
         Self {
             page,

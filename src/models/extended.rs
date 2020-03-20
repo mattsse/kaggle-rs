@@ -4,9 +4,37 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Competition {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub tags: Vec<Tag>,
+    pub description: String,
+    pub id: i64,
+    pub title: String,
+    pub url: String,
+    #[serde(with = "crate::models::extended::date_serializer")]
+    pub deadline: NaiveDateTime,
+    pub category: String,
+    pub reward: String,
+    pub organization_name: Option<String>,
+    pub organization_ref: Option<String>,
+    pub kernel_count: i64,
+    pub team_count: i64,
+    pub user_has_entered: bool,
+    pub user_rank: Option<i64>,
+    #[serde(with = "crate::models::extended::date_serializer_opt")]
+    pub merger_deadline: Option<NaiveDateTime>,
+    #[serde(with = "crate::models::extended::date_serializer_opt")]
+    pub new_entrant_deadline: Option<NaiveDateTime>,
+    #[serde(with = "crate::models::extended::date_serializer")]
+    pub enabled_date: NaiveDateTime,
+    pub max_daily_submissions: i64,
+    pub max_team_size: Option<i64>,
+    pub evaluation_metric: String,
+    pub awards_points: bool,
+    pub is_kernels_submissions_only: bool,
+    pub submissions_disabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,7 +74,7 @@ pub struct Dataset {
     pub is_reviewed: bool,
     pub is_featured: bool,
     pub license_name: String,
-    pub description: ::serde_json::Value,
+    pub description: Option<String>,
     pub owner_name: String,
     pub owner_ref: String,
     pub kernel_count: i64,
@@ -204,5 +232,41 @@ mod date_serializer {
         Ok(DateTime::parse_from_rfc3339(&time)
             .map(|d| d.naive_utc())
             .map_err(D::Error::custom)?)
+    }
+}
+
+mod date_serializer_opt {
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    fn time_to_json(t: NaiveDateTime) -> String {
+        DateTime::<Utc>::from_utc(t, Utc).to_rfc3339()
+    }
+
+    pub fn serialize<S: Serializer>(
+        time: &Option<NaiveDateTime>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if let Some(time) = time {
+            time_to_json(time.clone()).serialize(serializer)
+        } else {
+            time.serialize(serializer)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<NaiveDateTime>, D::Error> {
+        let time: Option<String> = Deserialize::deserialize(deserializer)?;
+        if let Some(time) = time {
+            Ok(Some(
+                DateTime::parse_from_rfc3339(&time)
+                    .map(|d| d.naive_utc())
+                    .map_err(D::Error::custom)?,
+            ))
+        } else {
+            Ok(None)
+        }
     }
 }
