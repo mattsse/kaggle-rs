@@ -1162,7 +1162,7 @@ impl KaggleApiClient {
     ///         .datasets_list(
     ///             &DatasetsList::default()
     ///                 .sort_by(SortBy::ViewCount)
-    ///                 .search("corona"),
+    ///                 .search("health"),
     ///         )
     ///         .await?;
     /// #    Ok(())
@@ -1175,12 +1175,53 @@ impl KaggleApiClient {
         )
     }
 
-    /// List dataset files.
-    pub async fn datasets_list_files(&self, name: &str) -> anyhow::Result<ListFilesResult> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+    /// List all files for a dataset.
+    ///
+    /// If the [`name`] is not a combination of
+    /// `<user-name-slug>/<dataset-name-slug>` but only a single slug, the
+    /// client request to list all the files for the authorized user's dataset
+    /// with that name `<client-auth-username>/<name>`.
+    ///
+    /// # Example
+    ///
+    /// List all files for a dataset provided by another user.
+    ///
+    /// ```no_run
+    /// # use kaggle::KaggleApiClient;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .datasets_list_files("allen-institute-for-ai/CORD-19-research-challenge")
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    /// # Example
+    ///
+    /// List all files for your own dataset.
+    ///
+    /// ```no_run
+    /// # use kaggle::KaggleApiClient;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .datasets_list_files("my-awesome-dataset")
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub async fn datasets_list_files(
+        &self,
+        name: impl AsRef<str>,
+    ) -> anyhow::Result<ListFilesResult> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
         Ok(Self::request_json(
             self.client
-                .get(self.join_url(format!("/datasets/list/{}/{}", owner_slug, dataset_slug))?),
+                .get(self.join_url(format!("datasets/list/{}/{}", owner_slug, dataset_slug))?),
         )
         .await?)
     }
@@ -1189,7 +1230,7 @@ impl KaggleApiClient {
     pub async fn datasets_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(self
-            .get_json(self.join_url(format!("/datasets/status/{}/{}", owner_slug, dataset_slug))?)
+            .get_json(self.join_url(format!("datasets/status/{}/{}", owner_slug, dataset_slug))?)
             .await?)
     }
 
@@ -1205,7 +1246,7 @@ impl KaggleApiClient {
         Ok(Self::request_json(
             self.client
                 .post(self.join_url(format!(
-                    "/datasets/upload/file/{}/{}",
+                    "datasets/upload/file/{}/{}",
                     content_length,
                     last_modified_date_utc.as_secs()
                 ))?)
@@ -1215,19 +1256,20 @@ impl KaggleApiClient {
     }
 
     /// Show details about a dataset.
-    pub async fn datasets_view(&self, name: &str) -> anyhow::Result<Dataset> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn datasets_view(&self, name: impl AsRef<str>) -> anyhow::Result<Dataset> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
         Ok(self
-            .get_json(self.join_url(format!("/datasets/view/{}/{}", owner_slug, dataset_slug))?)
+            .get_json(self.join_url(format!("datasets/view/{}/{}", owner_slug, dataset_slug))?)
             .await?)
     }
 
     /// Retrieve output for a specified kernel.
     pub async fn kernels_output(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         path: Option<impl AsRef<Path>>,
     ) -> anyhow::Result<Vec<PathBuf>> {
+        let name = name.as_ref();
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
 
         let folder = if let Some(path) = path {
@@ -1276,7 +1318,7 @@ impl KaggleApiClient {
 
         Ok(self
             .get_json(self.join_url(format!(
-                "/kernels/output?userName={}&kernelSlug={}",
+                "kernels/output?userName={}&kernelSlug={}",
                 owner_slug, kernel_slug
             ))?)
             .await?)
@@ -1287,7 +1329,7 @@ impl KaggleApiClient {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(self
             .get_json(self.join_url(format!(
-                "/kernels/pull?userName={}&kernelSlug={}",
+                "kernels/pull?userName={}&kernelSlug={}",
                 owner_slug, kernel_slug
             ))?)
             .await?)
@@ -1458,7 +1500,7 @@ impl KaggleApiClient {
     pub async fn kernel_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
         Ok(Self::request_json(self.client.get(self.join_url(format!(
-            "/kernels/status?userName={}&kernelSlug={}",
+            "kernels/status?userName={}&kernelSlug={}",
             owner_slug, kernel_slug
         ))?))
         .await?)
@@ -1468,7 +1510,7 @@ impl KaggleApiClient {
     pub async fn kernels_list(&self, kernel_list: &KernelsList) -> anyhow::Result<Vec<Kernel>> {
         Ok(Self::request_json(
             self.client
-                .get(self.join_url("/kernels/list")?)
+                .get(self.join_url("kernels/list")?)
                 .query(kernel_list),
         )
         .await?)
@@ -1477,10 +1519,10 @@ impl KaggleApiClient {
     /// Get the metadata for a dataset.
     pub async fn metadata_get(&self, name: &str) -> anyhow::Result<Metadata> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
-        Ok(Self::request_json(self.client.get(self.join_url(format!(
-            "/datasets/metadata/{}/{}",
-            owner_slug, dataset_slug
-        ))?))
+        Ok(Self::request_json(
+            self.client
+                .get(self.join_url(format!("datasets/metadata/{}/{}", owner_slug, dataset_slug))?),
+        )
         .await?)
     }
 
@@ -1514,10 +1556,7 @@ impl KaggleApiClient {
 
         Ok(self
             .post_json(
-                self.join_url(format!(
-                    "/datasets/metadata/{}/{}",
-                    owner_slug, dataset_slug
-                ))?,
+                self.join_url(format!("datasets/metadata/{}/{}", owner_slug, dataset_slug))?,
                 Some(settings),
             )
             .await?)

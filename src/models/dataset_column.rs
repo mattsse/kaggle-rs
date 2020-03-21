@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DatasetColumn {
     /// The order that the column comes in, 0-based. (The first column is 0,
     /// second is 1, etc.)

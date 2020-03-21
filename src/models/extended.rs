@@ -1,3 +1,4 @@
+use crate::models::DatasetColumn;
 use crate::query::{Language, PushKernelType};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -144,9 +145,28 @@ pub struct DatasetNewResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListFilesResult {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    // TODO is this a string?
+    pub error_message: Option<serde_json::Value>,
+    pub dataset_files: Vec<DatasetFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetFile {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    #[serde(with = "crate::models::extended::date_serializer")]
+    pub creation_date: NaiveDateTime,
+    pub dataset_ref: String,
+    pub description: Option<String>,
+    pub file_type: String,
+    pub name: String,
+    pub owner_ref: String,
+    pub total_bytes: i64,
+    pub url: String,
+    pub columns: Vec<DatasetColumn>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
