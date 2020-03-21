@@ -1,3 +1,4 @@
+use crate::models::metadata::Metadata;
 use crate::models::{Collaborator, DatasetColumn, License};
 use crate::query::{KernelType, Language, PushKernelType};
 use chrono::NaiveDateTime;
@@ -233,11 +234,8 @@ pub struct Kernel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KernelPullResponse {
+    pub metadata: KernelMetadata,
     pub blob: KernelBlob,
-    // TODO
-    pub metadata: DatasetMetadata,
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl KernelPullResponse {
@@ -254,14 +252,35 @@ impl KernelPullResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KernelMetadata {
+    pub id: i64,
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub title: String,
+    pub author: String,
+    pub slug: String,
+    #[serde(with = "crate::models::extended::date_serializer_opt")]
+    pub last_run_time: Option<NaiveDateTime>,
+    pub language: Option<Language>,
+    pub kernel_type: Option<PushKernelType>,
+    pub is_private: Option<bool>,
+    pub enable_gpu: Option<bool>,
+    pub enable_internet: Option<bool>,
+    pub category_ids: Vec<String>,
+    pub dataset_data_sources: Vec<String>,
+    pub kernel_data_sources: Vec<String>,
+    pub competition_data_sources: Vec<String>,
+    pub total_votes: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KernelBlob {
     #[serde(rename = "kernelType")]
     pub kernel_type: PushKernelType,
     pub language: Language,
     pub slug: String,
     pub source: String,
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

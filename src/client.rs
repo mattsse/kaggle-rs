@@ -1501,22 +1501,13 @@ impl KaggleApiClient {
     }
 
     /// Get the status of a kernel.
-    pub async fn kernel_status(
-        &self,
-        name: impl AsRef<str>,
-    ) -> anyhow::Result<Option<serde_json::Value>> {
+    pub async fn kernel_status(&self, name: impl AsRef<str>) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        let resp = Self::request_json(self.client.get(self.join_url(format!(
+        Ok(Self::request_json(self.client.get(self.join_url(format!(
             "kernels/status?userName={}&kernelSlug={}",
             owner_slug, kernel_slug
         ))?))
-        .await;
-        if let Err(cause) = &resp {
-            if cause.downcast_ref::<KaggleError>().is_some() {
-                return Ok(None);
-            }
-        }
-        resp
+        .await?)
     }
 
     /// List kernels based on a set of search criteria.
