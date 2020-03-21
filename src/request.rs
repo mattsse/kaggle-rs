@@ -113,10 +113,6 @@ impl Default for KernelsList {
 }
 
 impl KernelsList {
-    pub fn builder() -> Self {
-        Self::default()
-    }
-
     pub fn with_page(page: usize) -> Self {
         Self {
             page,

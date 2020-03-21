@@ -1,5 +1,5 @@
-use crate::models::DatasetColumn;
-use crate::query::{Language, PushKernelType};
+use crate::models::{Collaborator, DatasetColumn, License};
+use crate::query::{KernelType, Language, PushKernelType};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -68,7 +68,7 @@ pub struct Dataset {
     pub subtitle: String,
     pub tags: Vec<Tag>,
     pub creator_name: String,
-    pub creator_url: String,
+    pub creator_url: Option<String>,
     pub total_bytes: i64,
     pub url: String,
     #[serde(with = "crate::models::extended::date_serializer")]
@@ -77,7 +77,7 @@ pub struct Dataset {
     pub is_private: bool,
     pub is_reviewed: bool,
     pub is_featured: bool,
-    pub license_name: String,
+    pub license_name: Option<String>,
     pub description: Option<String>,
     pub owner_name: String,
     pub owner_ref: String,
@@ -87,8 +87,8 @@ pub struct Dataset {
     pub view_count: i64,
     pub vote_count: i64,
     pub current_version_number: i64,
-    pub files: Vec<::serde_json::Value>,
-    pub versions: Vec<::serde_json::Value>,
+    pub files: Vec<File>,
+    pub versions: Vec<DatasetVersion>,
     pub usability_rating: f64,
 }
 
@@ -108,21 +108,60 @@ pub struct Tag {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metadata {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+#[serde(rename_all = "camelCase")]
+pub struct DatasetMetadata {
+    pub dataset_id: i64,
+    pub dataset_slug: String,
+    pub owner_user: ::serde_json::Value,
+    pub usability_rating: f64,
+    pub total_views: i64,
+    pub total_votes: i64,
+    pub total_downloads: i64,
+    pub title: String,
+    pub subtitle: String,
+    pub description: String,
+    pub is_private: bool,
+    pub licenses: Vec<License>,
+    pub keywords: Vec<String>,
+    pub collaborators: Vec<Collaborator>,
+    pub data: Vec<MetadataData>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatasetVersion {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+#[serde(rename_all = "camelCase")]
+pub struct MetadataData {
+    pub description: Option<String>,
+    pub name: String,
+    pub total_bytes: i64,
+    pub columns: Vec<DatasetColumn>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct File {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    #[serde(with = "crate::models::extended::date_serializer_opt")]
+    pub creation_date: Option<NaiveDateTime>,
+    pub dataset_ref: String,
+    pub description: Option<String>,
+    pub file_type: String,
+    pub name: String,
+    pub owner_ref: String,
+    pub total_bytes: i64,
+    pub url: String,
+    pub columns: Vec<DatasetColumn>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetVersion {
+    pub version_number: i64,
+    pub creation_date: String,
+    pub creator_name: String,
+    pub creator_ref: String,
+    pub version_notes: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -170,15 +209,33 @@ pub struct DatasetFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Kernel {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    pub id: i64,
+    #[serde(rename = "ref")]
+    pub ref_field: String,
+    pub title: String,
+    pub author: String,
+    pub slug: Option<String>,
+    #[serde(with = "crate::models::extended::date_serializer_opt")]
+    pub last_run_time: Option<NaiveDateTime>,
+    pub language: Option<Language>,
+    pub kernel_type: Option<KernelType>,
+    pub is_private: Option<bool>,
+    pub enable_gpu: Option<bool>,
+    pub enable_internet: Option<bool>,
+    pub category_ids: Vec<String>,
+    pub dataset_data_sources: Vec<String>,
+    pub kernel_data_sources: Vec<String>,
+    pub competition_data_sources: Vec<String>,
+    pub total_votes: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KernelPullResponse {
     pub blob: KernelBlob,
-    pub metadata: Metadata,
+    // TODO
+    pub metadata: DatasetMetadata,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }

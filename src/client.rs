@@ -22,6 +22,7 @@ use crate::error::{ApiError, KaggleError};
 use crate::models::extended::{
     Competition,
     Dataset,
+    DatasetMetadata,
     DatasetNewResponse,
     DatasetNewVersionResponse,
     File,
@@ -1308,8 +1309,8 @@ impl KaggleApiClient {
     }
 
     /// RDownload the latest output from a kernel
-    pub async fn kernel_output(&self, name: &str) -> anyhow::Result<KernelOutput> {
-        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn kernel_output(&self, name: impl AsRef<str>) -> anyhow::Result<KernelOutput> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
 
         if kernel_slug.len() < 5 {
             return Err(KaggleError::meta(format!(
@@ -1328,8 +1329,8 @@ impl KaggleApiClient {
     }
 
     /// Pull the latest code from a kernel.
-    pub async fn kernel_pull(&self, name: &str) -> anyhow::Result<KernelPullResponse> {
-        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn kernel_pull(&self, name: impl AsRef<str>) -> anyhow::Result<KernelPullResponse> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
         Ok(self
             .get_json(self.join_url(format!(
                 "kernels/pull?userName={}&kernelSlug={}",
@@ -1500,16 +1501,41 @@ impl KaggleApiClient {
     }
 
     /// Get the status of a kernel.
-    pub async fn kernel_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
-        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
-        Ok(Self::request_json(self.client.get(self.join_url(format!(
+    pub async fn kernel_status(
+        &self,
+        name: impl AsRef<str>,
+    ) -> anyhow::Result<Option<serde_json::Value>> {
+        let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
+        let resp = Self::request_json(self.client.get(self.join_url(format!(
             "kernels/status?userName={}&kernelSlug={}",
             owner_slug, kernel_slug
         ))?))
-        .await?)
+        .await;
+        if let Err(cause) = &resp {
+            if cause.downcast_ref::<KaggleError>().is_some() {
+                return Ok(None);
+            }
+        }
+        resp
     }
 
     /// List kernels based on a set of search criteria.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use kaggle::request::KernelsList;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .kernels_list(&KernelsList::default().search("health"))
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub async fn kernels_list(&self, kernel_list: &KernelsList) -> anyhow::Result<Vec<Kernel>> {
         Ok(Self::request_json(
             self.client
@@ -1520,8 +1546,8 @@ impl KaggleApiClient {
     }
 
     /// Get the metadata for a dataset.
-    pub async fn metadata_get(&self, name: &str) -> anyhow::Result<Metadata> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn metadata_get(&self, name: impl AsRef<str>) -> anyhow::Result<DatasetMetadata> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
         Ok(Self::request_json(
             self.client
                 .get(self.join_url(format!("datasets/metadata/{}/{}", owner_slug, dataset_slug))?),
@@ -1532,9 +1558,10 @@ impl KaggleApiClient {
     /// Update the metadata for a dataset
     pub async fn dataset_metadata_update(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         path: Option<impl AsRef<Path>>,
     ) -> anyhow::Result<serde_json::Value> {
+        let name = name.as_ref();
         let metadata = if let Some(path) = path {
             Self::read_dataset_metadata_file(path).await?
         } else {
@@ -1552,10 +1579,10 @@ impl KaggleApiClient {
 
     pub async fn metadata_post(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         settings: &DatasetUpdateSettingsRequest,
     ) -> anyhow::Result<serde_json::Value> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
 
         Ok(self
             .post_json(
