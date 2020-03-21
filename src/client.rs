@@ -1227,8 +1227,11 @@ impl KaggleApiClient {
     }
 
     /// Get dataset creation status.
-    pub async fn datasets_status(&self, name: &str) -> anyhow::Result<serde_json::Value> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+    pub async fn datasets_status(
+        &self,
+        name: impl AsRef<str>,
+    ) -> anyhow::Result<Option<serde_json::Value>> {
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
         Ok(self
             .get_json(self.join_url(format!("datasets/status/{}/{}", owner_slug, dataset_slug))?)
             .await?)
