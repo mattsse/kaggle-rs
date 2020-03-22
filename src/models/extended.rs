@@ -143,13 +143,14 @@ pub struct File {
     pub ref_: String,
     #[serde(with = "crate::models::extended::date_serializer_opt")]
     pub creation_date: Option<NaiveDateTime>,
-    pub dataset_ref: String,
+    pub dataset_ref: Option<String>,
     pub description: Option<String>,
-    pub file_type: String,
+    pub file_type: Option<String>,
     pub name: String,
-    pub owner_ref: String,
+    pub owner_ref: Option<String>,
     pub total_bytes: i64,
     pub url: String,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub columns: Vec<DatasetColumn>,
 }
 

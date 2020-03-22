@@ -682,41 +682,93 @@ impl KaggleApiClient {
 
     /// Download a competition data file to a designated location, or to
     /// download location.
+    /// Returns the location of the zip file download.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if the authorized user has not yet accepted the
+    /// competition's rules.
+    ///
+    /// # Example
+    ///
+    /// Download file `train.csv` from competition
+    /// `3d-object-detection-for-autonomous-vehicles` as zipfile to
+    /// `<download-dir>/train.csv.zip`
+    ///
+    /// ```no_run
+    /// # use kaggle::models::DatasetNew;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .competitions_data_download_file(
+    ///             "3d-object-detection-for-autonomous-vehicles",
+    ///             "train.csv",
+    ///             None,
+    ///         )
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub async fn competitions_data_download_file(
         &self,
         id: impl AsRef<str>,
         file_name: impl AsRef<str>,
         target: Option<PathBuf>,
     ) -> anyhow::Result<PathBuf> {
-        let id = id.as_ref();
-        let output = if let Some(target) = target {
-            target.to_path_buf()
-        } else {
-            self.download_dir.join(format!("{}.zip", id))
-        };
+        let file_name = file_name.as_ref();
+        let output = target.unwrap_or_else(|| self.download_dir.join(format!("{}.zip", file_name)));
 
         Ok(Self::download_file(
             self.client.get(self.join_url(format!(
                 "competitions/data/download/{}/{}",
-                id,
-                file_name.as_ref()
+                id.as_ref(),
+                file_name
             ))?),
             output,
         )
         .await?)
     }
 
-    /// Downloads all competition files
-    pub async fn competitions_data_download_all_files<T: AsRef<Path>>(
+    /// Downloads all competition files and returns the location of the zip file
+    /// download.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if the authorized user has not yet accepted the
+    /// competition's rules.
+    ///
+    /// # Example
+    ///
+    /// Download all files from competition
+    /// `m5-forecasting-accuracy` as zipfile to
+    /// `<download-dir>/m5-forecasting-accuracy.zip`
+    ///
+    /// ```no_run
+    /// # use kaggle::models::DatasetNew;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .competitions_data_download_all_files(
+    ///             "m5-forecasting-accuracy",
+    ///             None,
+    ///         )
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub async fn competitions_data_download_all_files(
         &self,
-        id: &str,
-        target: Option<T>,
+        id: impl AsRef<str>,
+        target: Option<PathBuf>,
     ) -> anyhow::Result<PathBuf> {
-        let output = if let Some(target) = target {
-            target.as_ref().to_path_buf()
-        } else {
-            self.download_dir.join(format!("{}.zip", id))
-        };
+        let id = id.as_ref();
+        let output = target.unwrap_or_else(|| self.download_dir.join(format!("{}.zip", id)));
 
         Ok(Self::download_file(
             self.client
@@ -726,24 +778,47 @@ impl KaggleApiClient {
         .await?)
     }
 
+    /// List all data files for a competition
     ///
-    pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<Vec<File>> {
+    /// # Example
+    ///
+    /// Overview of all files in the `m5-forecasting-accuracy` competition
+    ///
+    /// ```no_run
+    /// # use kaggle::models::DatasetNew;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .competitions_data_list_files(
+    ///             "m5-forecasting-accuracy",
+    ///         )
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub async fn competitions_data_list_files(
+        &self,
+        id: impl AsRef<str>,
+    ) -> anyhow::Result<Vec<File>> {
         Ok(Self::request_json(
             self.client
-                .get(self.join_url(format!("competitions/data/list/{}", id))?),
+                .get(self.join_url(format!("competitions/data/list/{}", id.as_ref()))?),
         )
         .await?)
     }
 
-    /// Get the list of Submission for a particular competition
+    /// Get the list submissions for a particular competition
     pub async fn competitions_submissions_list(
         &self,
-        id: &str,
+        id: impl AsRef<str>,
         page: usize,
     ) -> anyhow::Result<Vec<Submission>> {
         let req = self
             .client
-            .get(self.join_url(format!("competitions/submissions/list/{}", id))?)
+            .get(self.join_url(format!("competitions/submissions/list/{}", id.as_ref()))?)
             .query(&[("page", page)]);
 
         Ok(Self::request_json(req).await?)
@@ -768,7 +843,7 @@ impl KaggleApiClient {
         .await?)
     }
 
-    /// Submit a competition
+    /// Submit a competition.
     pub async fn competition_submit(
         &self,
         file: impl AsRef<Path>,
