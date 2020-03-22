@@ -7,7 +7,6 @@ use thiserror::Error;
 #[derive(Debug)]
 pub enum ApiError {
     Unauthorized,
-    RateLimited(Option<usize>),
     Other(u16),
     ServerError(Error),
 }
@@ -18,13 +17,6 @@ impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ApiError::Unauthorized => write!(f, "Unauthorized request to API"),
-            ApiError::RateLimited(e) => {
-                if let Some(d) = e {
-                    write!(f, "Exceeded API request limit - please wait {} seconds", d)
-                } else {
-                    write!(f, "Exceeded API request limit")
-                }
-            }
             ApiError::Other(s) => write!(f, "Kaggle API reported error code {}", s),
             ApiError::ServerError(err) => err.fmt(f),
         }

@@ -42,6 +42,7 @@ use crate::models::{
     DatasetNewVersionRequest,
     DatasetUpdateSettingsRequest,
     DatasetUploadFile,
+    Error,
     KernelPushRequest,
 };
 use crate::query::{PushKernelType, PushLanguageType};
@@ -385,23 +386,22 @@ impl KaggleApiClient {
         if resp.status().is_success() {
             Ok(resp)
         } else {
-            let err = match resp.status() {
-                StatusCode::UNAUTHORIZED => ApiError::Unauthorized,
-                StatusCode::TOO_MANY_REQUESTS => {
-                    if let Ok(duration) = resp.headers()[reqwest::header::RETRY_AFTER].to_str() {
-                        ApiError::RateLimited(duration.parse::<usize>().ok())
-                    } else {
-                        ApiError::RateLimited(None)
-                    }
+            let status = resp.status();
+            if let Ok(err) = resp.json::<Error>().await {
+                return Err(KaggleError::Api {
+                    err: ApiError::ServerError(err),
                 }
+                .into());
+            }
+            let err = match status {
+                StatusCode::UNAUTHORIZED => ApiError::Unauthorized,
                 status => ApiError::Other(status.as_u16()),
             };
             Err(KaggleError::Api { err }.into())
         }
     }
 
-    /// Write the request's response to the provided output destination.
-    async fn download_file(
+    async fn write_resp(
         mut res: reqwest::Response,
         output: impl AsRef<Path>,
     ) -> anyhow::Result<PathBuf> {
@@ -412,6 +412,14 @@ impl KaggleApiClient {
             file.write_all(&chunk).await?;
         }
         Ok(output.to_path_buf())
+    }
+
+    /// Write the request's response to the provided output destination.
+    async fn download_file(
+        req: reqwest::RequestBuilder,
+        output: impl AsRef<Path>,
+    ) -> anyhow::Result<PathBuf> {
+        Ok(Self::write_resp(Self::request(req).await?, output).await?)
     }
 
     pub(crate) async fn read_dataset_metadata_file(
@@ -640,9 +648,7 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("competitions/{}/leaderboard/download", id))?)
-                .send()
-                .await?,
+                .get(self.join_url(format!("competitions/{}/leaderboard/download", id))?),
             output,
         )
         .await?)
@@ -674,25 +680,27 @@ impl KaggleApiClient {
         .await?)
     }
 
-    /// Download a competition data file to a designated location, or use a
-    /// default location
-    pub async fn competitions_data_download_file<T: AsRef<Path>>(
+    /// Download a competition data file to a designated location, or to
+    /// download location.
+    pub async fn competitions_data_download_file(
         &self,
-        id: &str,
-        file_name: &str,
-        target: Option<T>,
+        id: impl AsRef<str>,
+        file_name: impl AsRef<str>,
+        target: Option<PathBuf>,
     ) -> anyhow::Result<PathBuf> {
+        let id = id.as_ref();
         let output = if let Some(target) = target {
-            target.as_ref().to_path_buf()
+            target.to_path_buf()
         } else {
             self.download_dir.join(format!("{}.zip", id))
         };
 
         Ok(Self::download_file(
-            self.client
-                .get(self.join_url(format!("competitions/data/download/{}/{}", id, file_name))?)
-                .send()
-                .await?,
+            self.client.get(self.join_url(format!(
+                "competitions/data/download/{}/{}",
+                id,
+                file_name.as_ref()
+            ))?),
             output,
         )
         .await?)
@@ -712,9 +720,7 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("competitions/data/download-all/{}", id))?)
-                .send()
-                .await?,
+                .get(self.join_url(format!("competitions/data/download-all/{}", id))?),
             output,
         )
         .await?)
@@ -1118,8 +1124,6 @@ impl KaggleApiClient {
             req = req.query(&[("datasetVersionNumber", version)]);
         }
 
-        let resp = Self::request(req).await?;
-
         let folder = if let Some(path) = path {
             path.as_ref().to_path_buf()
         } else {
@@ -1129,7 +1133,7 @@ impl KaggleApiClient {
         fs::create_dir_all(&folder)?;
 
         let outfile =
-            Self::download_file(resp, folder.join(format!("{}.zip", dataset_slug))).await?;
+            Self::download_file(req, folder.join(format!("{}.zip", dataset_slug))).await?;
 
         crate::archive::unzip(&outfile)?;
 
@@ -1181,7 +1185,7 @@ impl KaggleApiClient {
 
         // TODO check if file is already available and is older than the Last-Modified
         // header value
-        Ok(Self::download_file(resp, outfile).await?)
+        Ok(Self::write_resp(resp, outfile).await?)
     }
 
     /// List datasets
