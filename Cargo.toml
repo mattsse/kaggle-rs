@@ -6,6 +6,8 @@ edition = "2018"
 license = "MIT OR Apache 2.0"
 description = "Unofficial rust implementation of the kaggle api"
 documentation = "https://docs.rs/kaggle-rs/"
+categories = ["science", "Web programming"]
+keywords = ["kaggle", "data science", "datasets"]
  
 repository = "https://github.com/mattsse/kaggle-rs"
  
@@ -32,7 +34,7 @@ tar = "0.4"
 walkdir = "2.3"
 slug = "0.1"
 log = "0.4.8"
-flate2 = "1.0.13"
+flate2 = "1.0"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["macros"] }
