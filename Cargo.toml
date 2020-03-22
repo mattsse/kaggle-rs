@@ -6,7 +6,7 @@ edition = "2018"
 license = "Apache-2.0"
 description = "Unofficial rust implementation of the kaggle api"
 documentation = "https://docs.rs/kaggle-rs/"
-categories = ["science", "Web programming"]
+categories = ["science", "web-programming"]
 keywords = ["kaggle", "data-science", "datasets"]
  
 repository = "https://github.com/mattsse/kaggle-rs"
