@@ -32,7 +32,7 @@
 //! kaggle::Authentication::Env;
 //! ```
 
-mod archive;
+pub mod archive;
 pub mod client;
 mod error;
 pub mod models;

@@ -51,15 +51,16 @@ impl Default for ArchiveMode {
     }
 }
 
-pub(crate) fn unzip(file: impl AsRef<Path>) -> anyhow::Result<()> {
+/// unzip file into location of `to`
+pub fn unzip(file: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()> {
     let file = file.as_ref();
-
+    let to = to.as_ref();
     let file = fs::File::open(file)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let outpath = file.sanitized_name();
+        let outpath = to.join(&file.sanitized_name());
 
         if (&*file.name()).ends_with('/') {
             fs::create_dir_all(&outpath)?;
