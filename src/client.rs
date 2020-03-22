@@ -696,7 +696,6 @@ impl KaggleApiClient {
     /// `<download-dir>/train.csv.zip`
     ///
     /// ```no_run
-    /// # use kaggle::models::DatasetNew;
     /// # use kaggle::KaggleApiClient;
     ///
     /// # #[tokio::main]
@@ -747,7 +746,6 @@ impl KaggleApiClient {
     /// `<download-dir>/m5-forecasting-accuracy.zip`
     ///
     /// ```no_run
-    /// # use kaggle::models::DatasetNew;
     /// # use kaggle::KaggleApiClient;
     ///
     /// # #[tokio::main]
@@ -785,7 +783,6 @@ impl KaggleApiClient {
     /// Overview of all files in the `m5-forecasting-accuracy` competition
     ///
     /// ```no_run
-    /// # use kaggle::models::DatasetNew;
     /// # use kaggle::KaggleApiClient;
     ///
     /// # #[tokio::main]
@@ -1182,13 +1179,33 @@ impl KaggleApiClient {
             .await?)
     }
 
+    /// Download all files of a dataset.
+    ///
+    /// # Example
+    ///
+    /// Download the newest version of the whole `unanimad/dataisbeautiful`
+    /// dataset as zip file into
+    /// `<download-dir>/datasets/unanimad/dataisbeautiful.zip`
+    ///
+    /// ```no_run
+    /// use kaggle::KaggleApiClient;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .dataset_download_all_files("unanimad/dataisbeautiful", None, None)
+    ///         .await?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn dataset_download_all_files(
         &self,
-        name: &str,
-        path: Option<impl AsRef<Path>>,
+        name: impl AsRef<str>,
+        path: Option<PathBuf>,
         dataset_version_number: Option<&str>,
     ) -> anyhow::Result<PathBuf> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
 
         let mut req = self
             .client
@@ -1199,40 +1216,40 @@ impl KaggleApiClient {
             req = req.query(&[("datasetVersionNumber", version)]);
         }
 
-        let folder = if let Some(path) = path {
-            path.as_ref().to_path_buf()
-        } else {
+        let folder = path.unwrap_or_else(|| {
             self.download_dir
                 .join(format!("datasets/{}/{}", owner_slug, dataset_slug,))
-        };
+        });
+
         fs::create_dir_all(&folder)?;
 
         let outfile =
             Self::download_file(req, folder.join(format!("{}.zip", dataset_slug))).await?;
 
-        crate::archive::unzip(&outfile)?;
+        // crate::archive::unzip(&outfile, &folder)?;
+        // // TODO add option to keep zip files
+        // fs::remove_file(outfile)?;
 
-        // TODO add option to keep zip files
-        fs::remove_file(outfile)?;
-
-        Ok(folder)
+        Ok(outfile)
     }
 
     /// Download a single file for a dataset.
     pub async fn dataset_download_file(
         &self,
-        name: &str,
-        file_name: &str,
-        folder: Option<impl AsRef<Path>>,
+        name: impl AsRef<str>,
+        file_name: impl AsRef<str>,
+        folder: Option<PathBuf>,
         dataset_version_number: Option<&str>,
     ) -> anyhow::Result<PathBuf> {
-        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
+        let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
 
         let mut req = self
             .client
             .get(self.join_url(format!(
                 "datasets/download/{}/{}/{}",
-                owner_slug, dataset_slug, file_name
+                owner_slug,
+                dataset_slug,
+                file_name.as_ref()
             ))?)
             .header(header::ACCEPT, HeaderValue::from_static("file"));
 
@@ -1249,12 +1266,11 @@ impl KaggleApiClient {
             .last()
             .context("no file segment in url download path")?;
 
-        let output = if let Some(folder) = folder {
-            folder.as_ref().to_path_buf()
-        } else {
+        let output = folder.unwrap_or_else(|| {
             self.download_dir
                 .join(format!("datasets/{}/{}", owner_slug, dataset_slug))
-        };
+        });
+
         fs::create_dir_all(&output)?;
         let outfile = output.join(url);
 
