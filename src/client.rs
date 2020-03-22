@@ -1647,7 +1647,7 @@ impl KaggleApiClient {
     ///
     /// Example
     ///
-    /// ```
+    /// ```no_run
     /// use kaggle::request::KernelsList;
     /// use kaggle::KaggleApiClient;
     ///
