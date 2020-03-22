@@ -15,7 +15,7 @@ use kaggle::KaggleApiClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    let kaggle = KaggleApiClient::builder().build()?;
     let dataset = kaggle
         .dataset_download_all_files("unanimad/dataisbeautiful", None, None)
         .await?;
