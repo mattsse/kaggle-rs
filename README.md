@@ -1,6 +1,6 @@
 # kaggle-rs - accessing kaggle.com the rust way
 
-[![Build Status](https://travis-ci.com/mattsse/kaggle.svg?branch=master)](https://travis-ci.com/mattsse/kaggle)
+[![Build Status](https://travis-ci.com/mattsse/kaggle-rs.svg?branch=master)](https://travis-ci.com/mattsse/kaggle-rs)
 [![Crates.io](https://img.shields.io/crates/v/kaggle.svg)](https://crates.io/crates/kaggle)
 [![Documentation](https://docs.rs/kaggle/badge.svg)](https://docs.rs/kaggle)
 
