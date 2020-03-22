@@ -54,10 +54,11 @@ use log::debug;
 
 /// Client to interact with the kaggle api.
 ///
-/// # Example
+/// #Example
 ///
-/// ```
-/// # use kaggle::{KaggleApiClient, Authentication};
+/// ```no_run
+/// use kaggle::KaggleApiClient;
+/// let kaggle = KaggleApiClient::builder().build().unwrap();
 /// ```
 #[derive(Clone)]
 pub struct KaggleApiClient {
@@ -609,16 +610,16 @@ impl KaggleApiClient {
     /// If [`output`] is `None`, then the destination is
     /// `<self.download_dir>/<id>-leaderboard.zip`
     ///
-    /// # Example
+    /// Example
     ///
     /// ```no_run
-    /// # use kaggle::query::CompetitionSortBy;
-    /// # use kaggle::request::CompetitionsList;
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::query::CompetitionSortBy;
+    /// use kaggle::request::CompetitionsList;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .competitions_list(
     ///             &CompetitionsList::default()
@@ -626,8 +627,8 @@ impl KaggleApiClient {
     ///                 .search("health"),
     ///         )
     ///         .await?;
-    /// #    Ok(())
-    /// # }
+    ///    Ok(())
+    /// }
     /// ```
     pub async fn competition_download_leaderboard(
         &self,
@@ -656,18 +657,18 @@ impl KaggleApiClient {
 
     /// View a leaderboard based on a competition name
     ///
-    /// # Example
+    /// Example
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// use kaggle::KaggleApiClient;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .competition_view_leaderboard("digit-recognizer")
     ///         .await?;
-    /// #    Ok(())
-    /// # }
+    ///    Ok(())
+    /// }
     /// ```
     pub async fn competition_view_leaderboard(
         &self,
@@ -684,23 +685,23 @@ impl KaggleApiClient {
     /// download location.
     /// Returns the location of the zip file download.
     ///
-    /// # Errors
+    /// Errors
     ///
     /// This will fail if the authorized user has not yet accepted the
     /// competition's rules.
     ///
-    /// # Example
+    /// Example
     ///
     /// Download file `train.csv` from competition
     /// `3d-object-detection-for-autonomous-vehicles` as zipfile to
     /// `<download-dir>/train.csv.zip`
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .competitions_data_download_file(
     ///             "3d-object-detection-for-autonomous-vehicles",
@@ -708,8 +709,8 @@ impl KaggleApiClient {
     ///             None,
     ///         )
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn competitions_data_download_file(
         &self,
@@ -734,31 +735,31 @@ impl KaggleApiClient {
     /// Downloads all competition files and returns the location of the zip file
     /// download.
     ///
-    /// # Errors
+    /// Errors
     ///
     /// This will fail if the authorized user has not yet accepted the
     /// competition's rules.
     ///
-    /// # Example
+    /// Example
     ///
     /// Download all files from competition
     /// `m5-forecasting-accuracy` as zipfile to
     /// `<download-dir>/m5-forecasting-accuracy.zip`
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .competitions_data_download_all_files(
     ///             "m5-forecasting-accuracy",
     ///             None,
     ///         )
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn competitions_data_download_all_files(
         &self,
@@ -778,23 +779,23 @@ impl KaggleApiClient {
 
     /// List all data files for a competition
     ///
-    /// # Example
+    /// Example
     ///
     /// Overview of all files in the `m5-forecasting-accuracy` competition
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .competitions_data_list_files(
     ///             "m5-forecasting-accuracy",
     ///         )
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn competitions_data_list_files(
         &self,
@@ -980,7 +981,7 @@ impl KaggleApiClient {
     /// This will fail on kaggle if the metadata contains no resources to
     /// upload.
     ///
-    /// # Example
+    /// Example
     ///
     /// Create a new kaggle dataset based on the `./dataset-metadata.json`
     ///
@@ -1003,17 +1004,17 @@ impl KaggleApiClient {
     /// ```
     ///
     /// ```no_run
-    /// # use kaggle::models::DatasetNew;
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::models::DatasetNew;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .dataset_create_new(DatasetNew::with_metadata_file(".").await?)
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn dataset_create_new(
         &self,
@@ -1181,7 +1182,7 @@ impl KaggleApiClient {
 
     /// Download all files of a dataset.
     ///
-    /// # Example
+    /// Example
     ///
     /// Download the newest version of the whole `unanimad/dataisbeautiful`
     /// dataset as zip file into
@@ -1192,7 +1193,7 @@ impl KaggleApiClient {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .dataset_download_all_files("unanimad/dataisbeautiful", None, None)
     ///         .await?;
@@ -1281,16 +1282,16 @@ impl KaggleApiClient {
 
     /// List datasets
     ///
-    /// # Example
+    /// Example
     ///
     /// ```no_run
-    /// # use kaggle::request::DatasetsList;
-    /// # use kaggle::KaggleApiClient;
-    /// # use kaggle::query::SortBy;
+    /// use kaggle::request::DatasetsList;
+    /// use kaggle::KaggleApiClient;
+    /// use kaggle::query::SortBy;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .datasets_list(
     ///             &DatasetsList::default()
@@ -1298,8 +1299,8 @@ impl KaggleApiClient {
     ///                 .search("health"),
     ///         )
     ///         .await?;
-    /// #    Ok(())
-    /// # }
+    ///    Ok(())
+    /// }
     /// ```
     pub async fn datasets_list(&self, list: &DatasetsList) -> anyhow::Result<Vec<Dataset>> {
         Ok(
@@ -1315,37 +1316,37 @@ impl KaggleApiClient {
     /// client request to list all the files for the authorized user's dataset
     /// with that name `<client-auth-username>/<name>`.
     ///
-    /// # Example
+    /// Example
     ///
     /// List all files for a dataset provided by another user.
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
-    /// #
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// use kaggle::KaggleApiClient;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .datasets_list_files("allen-institute-for-ai/CORD-19-research-challenge")
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
-    /// # Example
+    /// Example
     ///
     /// List all files for your own dataset.
     ///
     /// ```no_run
-    /// # use kaggle::KaggleApiClient;
-    /// #
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// use kaggle::KaggleApiClient;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .datasets_list_files("my-awesome-dataset")
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn datasets_list_files(
         &self,
@@ -1644,20 +1645,20 @@ impl KaggleApiClient {
 
     /// List kernels based on a set of search criteria.
     ///
-    /// # Example
+    /// Example
     ///
     /// ```
-    /// # use kaggle::request::KernelsList;
-    /// # use kaggle::KaggleApiClient;
+    /// use kaggle::request::KernelsList;
+    /// use kaggle::KaggleApiClient;
     ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle = KaggleApiClient::builder().build()?;
     ///     let resp = kaggle
     ///         .kernels_list(&KernelsList::default().search("health"))
     ///         .await?;
-    /// #     Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn kernels_list(&self, kernel_list: &KernelsList) -> anyhow::Result<Vec<Kernel>> {
         Ok(Self::request_json(
