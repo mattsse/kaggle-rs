@@ -1,6 +1,6 @@
 pub use self::collaborator::Collaborator;
 pub use self::dataset_column::DatasetColumn;
-pub use self::dataset_new_request::DatasetNewRequest;
+pub use self::dataset_new_request::{DatasetNew, DatasetNewRequest};
 pub use self::dataset_new_version_request::DatasetNewVersionRequest;
 pub use self::dataset_update_settings_request::DatasetUpdateSettingsRequest;
 pub use self::dataset_upload_file::DatasetUploadFile;

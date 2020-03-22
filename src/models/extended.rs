@@ -1,4 +1,3 @@
-use crate::models::metadata::Metadata;
 use crate::models::{Collaborator, DatasetColumn, License};
 use crate::query::{KernelType, Language, PushKernelType};
 use chrono::NaiveDateTime;
@@ -180,15 +179,34 @@ pub struct DatasetNewVersionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatasetNewResponse {
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    /// If an error occurred, this is None
+    #[serde(rename = "ref")]
+    pub ref_: Option<String>,
+    pub url: String,
+    pub status: String,
+    pub error: Option<String>,
+    #[serde(rename = "invalidTags")]
+    pub invalid_tags: Vec<serde_json::Value>,
+}
+
+impl DatasetNewResponse {
+    pub fn is_success(&self) -> bool {
+        self.status == "ok"
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.status == "error"
+    }
+
+    pub fn cause(&self) -> Option<&String> {
+        self.error.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListFilesResult {
-    // TODO is this a string?
-    pub error_message: Option<serde_json::Value>,
+    pub error_message: Option<String>,
     pub dataset_files: Vec<DatasetFile>,
 }
 

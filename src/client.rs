@@ -13,7 +13,6 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio_util::codec;
-use walkdir::WalkDir;
 
 use anyhow::{anyhow, Context};
 
@@ -38,6 +37,7 @@ use crate::models::extended::{
 };
 use crate::models::metadata::{Metadata, Resource};
 use crate::models::{
+    DatasetNew,
     DatasetNewRequest,
     DatasetNewVersionRequest,
     DatasetUpdateSettingsRequest,
@@ -47,7 +47,6 @@ use crate::models::{
 use crate::query::{PushKernelType, PushLanguageType};
 use crate::request::{CompetitionsList, DatasetsList, KernelPullRequest, KernelsList};
 use std::collections::HashMap;
-use std::ops::Deref;
 use tempdir::TempDir;
 
 use log::debug;
@@ -362,7 +361,7 @@ impl KaggleApiClient {
     }
 
     async fn request_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> anyhow::Result<T> {
-        println!("Request: {:?}", req);
+        debug!("Request: {:?}", req);
         let full = Self::request(req).await?.bytes().await?;
         match serde_json::from_slice::<T>(&full) {
             Ok(resp) => Ok(resp),
@@ -415,7 +414,9 @@ impl KaggleApiClient {
         Ok(output.to_path_buf())
     }
 
-    async fn read_dataset_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Metadata> {
+    pub(crate) async fn read_dataset_metadata_file(
+        path: impl AsRef<Path>,
+    ) -> anyhow::Result<Metadata> {
         let meta_file = Self::get_dataset_metadata_file(path)?;
         let file = tokio::fs::read(&meta_file).await?;
         Ok(serde_json::from_slice(&file)?)
@@ -495,7 +496,9 @@ impl KaggleApiClient {
 
         let mut upload_file = DatasetUploadFile::new(info.token);
         if let Some(item) = item {
-            upload_file.set_description(item.description.clone());
+            if let Some(desc) = &item.description {
+                upload_file.set_description(desc.clone());
+            }
             if let Some(schema) = &item.schema {
                 upload_file.set_columns(schema.get_processed_columns());
             }
@@ -515,9 +518,12 @@ impl KaggleApiClient {
         dir_mode: ArchiveMode,
     ) -> anyhow::Result<Vec<DatasetUploadFile>> {
         let mut uploads = Vec::with_capacity(resources.len());
+        let folder = folder.as_ref();
 
-        let resource_paths: HashMap<_, _> =
-            resources.iter().map(|x| (x.path.as_str(), x)).collect();
+        let resource_paths: HashMap<_, _> = resources
+            .iter()
+            .map(|x| (folder.join(&x.path), x))
+            .collect();
 
         let mut tmp_archive_dir = None;
 
@@ -527,41 +533,35 @@ impl KaggleApiClient {
             Self::KERNEL_METADATA_FILE,
         ];
 
-        for entry in WalkDir::new(folder)
-            .min_depth(1)
-            .max_depth(1)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for (entry, resource) in resource_paths {
+            if !entry.exists() {
+                continue;
+            }
             let file_name = entry
-                .path()
                 .file_name()
                 .context("File path terminates in `..`")?
                 .to_str()
-                .context("File name is not valid unicode")?;
+                .context("File name is not valid unicode")?
+                .to_string();
 
             let mut upload = None;
 
-            if entry.path().is_file() {
-                if skip.contains(&file_name) {
+            if entry.is_file() {
+                if skip.contains(&file_name.as_str()) {
                     continue;
                 }
-                upload = Some(entry.path().to_path_buf());
-            } else if entry.path().is_dir() {
+                upload = Some(entry);
+            } else if entry.is_dir() {
                 if tmp_archive_dir.is_none() {
                     tmp_archive_dir = Some(TempDir::new("kaggle-upload")?);
                 }
-                let archive_path = tmp_archive_dir.as_ref().unwrap().path().join(file_name);
-                upload = dir_mode.make_archive(entry.path(), &archive_path)?;
+                let archive_path = tmp_archive_dir.as_ref().unwrap().path().join(&file_name);
+                upload = dir_mode.make_archive(entry, &archive_path)?;
             }
 
             if let Some(upload) = upload {
                 let upload_file = self
-                    .upload_dataset_file(
-                        upload,
-                        file_name,
-                        resource_paths.get(file_name).map(Deref::deref),
-                    )
+                    .upload_dataset_file(upload, &file_name, Some(&resource))
                     .await?;
                 uploads.push(upload_file);
             }
@@ -690,7 +690,7 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("/competitions/data/download/{}/{}", id, file_name))?)
+                .get(self.join_url(format!("competitions/data/download/{}/{}", id, file_name))?)
                 .send()
                 .await?,
             output,
@@ -712,7 +712,7 @@ impl KaggleApiClient {
 
         Ok(Self::download_file(
             self.client
-                .get(self.join_url(format!("/competitions/data/download-all/{}", id))?)
+                .get(self.join_url(format!("competitions/data/download-all/{}", id))?)
                 .send()
                 .await?,
             output,
@@ -724,7 +724,7 @@ impl KaggleApiClient {
     pub async fn competitions_data_list_files(&self, id: &str) -> anyhow::Result<Vec<File>> {
         Ok(Self::request_json(
             self.client
-                .get(self.join_url(format!("/competitions/data/list/{}", id))?),
+                .get(self.join_url(format!("competitions/data/list/{}", id))?),
         )
         .await?)
     }
@@ -737,7 +737,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<Vec<Submission>> {
         let req = self
             .client
-            .get(self.join_url(format!("/competitions/submissions/list/{}", id))?)
+            .get(self.join_url(format!("competitions/submissions/list/{}", id))?)
             .query(&[("page", page)]);
 
         Ok(Self::request_json(req).await?)
@@ -756,7 +756,7 @@ impl KaggleApiClient {
 
         Ok(Self::request_json(
             self.client
-                .post(self.join_url(format!("/competitions/submissions/submit/{}", id.as_ref()))?)
+                .post(self.join_url(format!("competitions/submissions/submit/{}", id.as_ref()))?)
                 .multipart(form),
         )
         .await?)
@@ -830,7 +830,7 @@ impl KaggleApiClient {
             .await?)
     }
 
-    pub async fn upload_complete(
+    async fn upload_complete(
         &self,
         file: impl AsRef<Path>,
         url: impl IntoUrl,
@@ -846,7 +846,7 @@ impl KaggleApiClient {
     }
 
     /// Upload competition submission file
-    pub async fn competitions_submissions_upload(
+    async fn competitions_submissions_upload(
         &self,
         file: impl AsRef<Path>,
         guid: impl AsRef<str>,
@@ -863,7 +863,7 @@ impl KaggleApiClient {
         let req = self
             .client
             .post(self.join_url(format!(
-                "/competitions/submissions/upload/{}/{}/{}",
+                "competitions/submissions/upload/{}/{}/{}",
                 guid.as_ref(),
                 content_length,
                 last_modified_date_utc.as_secs()
@@ -874,7 +874,7 @@ impl KaggleApiClient {
     }
 
     /// Generate competition submission URL
-    pub async fn competitions_submissions_url(
+    async fn competitions_submissions_url(
         &self,
         id: impl AsRef<str>,
         content_length: u64,
@@ -886,7 +886,7 @@ impl KaggleApiClient {
         let req = self
             .client
             .post(self.join_url(format!(
-                "/competitions/{}/submissions/url/{}/{}",
+                "competitions/{}/submissions/url/{}/{}",
                 id.as_ref(),
                 content_length,
                 last_modified_date_utc.as_secs()
@@ -895,19 +895,54 @@ impl KaggleApiClient {
         Ok(Self::request_json(req).await?)
     }
 
-    /// Create a new dataset, meaning the same as creating a version but with
+    /// Create a new dataset meaning the same as creating a version but with
     /// extra metadata like license and user/owner.
-    // TODO convert parameters to struct
+    ///
+    /// This will upload any referenced resources in the metadata resources.
+    /// This will fail on kaggle if the metadata contains no resources to
+    /// upload.
+    ///
+    /// # Example
+    ///
+    /// Create a new kaggle dataset based on the `./dataset-metadata.json`
+    ///
+    /// ```json
+    /// {
+    ///   "title": "My Awesome dataset",
+    ///   "id": "mattsse/my-awesome-dataset",
+    ///   "licenses": [
+    ///     {
+    ///       "name": "CC0-1.0"
+    ///     }
+    ///   ],
+    ///   "resources": [
+    ///     {
+    ///       "path": "LICENSE",
+    ///       "description": "This is the license"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// ```no_run
+    /// # use kaggle::models::DatasetNew;
+    /// # use kaggle::KaggleApiClient;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let kaggle: KaggleApiClient = KaggleApiClient::builder().build()?;
+    ///     let resp = kaggle
+    ///         .dataset_create_new(DatasetNew::with_metadata_file(".").await?)
+    ///         .await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub async fn dataset_create_new(
         &self,
-        folder: impl AsRef<Path>,
-        public: bool,
-        convert_to_csv: bool,
-        archive_mode: ArchiveMode,
+        new_dataset: DatasetNew,
     ) -> anyhow::Result<DatasetNewResponse> {
-        let folder = folder.as_ref();
-
-        let metadata: Metadata = Self::read_dataset_metadata_file(folder).await?;
+        new_dataset.validate_resources()?;
+        let metadata = new_dataset.metadata;
 
         let (owner_slug, dataset_slug) = self
             .get_user_and_identifier_slug(&metadata.id)
@@ -939,7 +974,6 @@ impl KaggleApiClient {
                 KaggleError::meta("The dataset title must be between 6 and 50 characters").into(),
             );
         }
-        metadata.validate_resource(folder)?;
 
         let mut request = DatasetNewRequest::builder(metadata.title);
         if let Some(subtitle) = &metadata.subtitle {
@@ -952,31 +986,35 @@ impl KaggleApiClient {
             request = request.subtitle(subtitle);
         }
 
-        let files = self
-            .upload_files(folder, &metadata.resources, archive_mode)
-            .await?;
+        let files = if let Some(folder) = new_dataset.dataset_folder {
+            self.upload_files(folder, &metadata.resources, new_dataset.archive_mode)
+                .await?
+        } else {
+            vec![]
+        };
 
-        let request = request
+        let mut request = request
             .slug(dataset_slug)
             .owner_slug(owner_slug)
             .license_name(metadata.licenses[0].to_string())
-            .description(metadata.description)
-            .private(!public)
-            .convert_to_csv(convert_to_csv)
+            .with_private(new_dataset.is_private)
+            .convert_to_csv(new_dataset.convert_to_csv)
             .category_ids(metadata.keywords)
-            .files(files)
-            .build();
+            .files(files);
+        if let Some(desc) = metadata.description {
+            request = request.description(desc);
+        }
 
-        Ok(self.datasets_create_new(request).await?)
+        Ok(self.datasets_create_new(&request.build()).await?)
     }
 
     /// Create a new dataset.
-    pub async fn datasets_create_new(
+    async fn datasets_create_new(
         &self,
-        new_dataset: DatasetNewRequest,
+        new_dataset: &DatasetNewRequest,
     ) -> anyhow::Result<DatasetNewResponse> {
         Ok(self
-            .post_json(self.join_url("/datasets/create/new")?, Some(&new_dataset))
+            .post_json(self.join_url("datasets/create/new")?, Some(new_dataset))
             .await?)
     }
 
@@ -1009,7 +1047,9 @@ impl KaggleApiClient {
             .upload_files(folder, &meta_data.resources, archive_mode)
             .await?;
 
-        req.set_description(meta_data.description);
+        if let Some(desc) = meta_data.description {
+            req.set_description(desc);
+        }
         req.set_category_ids(meta_data.keywords);
         req.set_convert_to_csv(convert_to_csv);
         req.set_delete_old_versions(delete_old_versions);
@@ -1039,7 +1079,7 @@ impl KaggleApiClient {
         Ok(self
             .post_json(
                 self.join_url(format!(
-                    "/datasets/create/version/{}/{}",
+                    "datasets/create/version/{}/{}",
                     owner_slug, dataset_slug
                 ))?,
                 Some(dataset_req),
@@ -1055,7 +1095,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<DatasetNewVersionResponse> {
         Ok(self
             .post_json(
-                self.join_url(format!("/datasets/create/version/{}", id))?,
+                self.join_url(format!("datasets/create/version/{}", id))?,
                 Some(dataset_req),
             )
             .await?)
@@ -1071,10 +1111,7 @@ impl KaggleApiClient {
 
         let mut req = self
             .client
-            .get(self.join_url(format!(
-                "/datasets/download/{}/{}",
-                owner_slug, dataset_slug
-            ))?)
+            .get(self.join_url(format!("datasets/download/{}/{}", owner_slug, dataset_slug))?)
             .header(header::ACCEPT, HeaderValue::from_static("file"));
 
         if let Some(version) = dataset_version_number {
@@ -1115,7 +1152,7 @@ impl KaggleApiClient {
         let mut req = self
             .client
             .get(self.join_url(format!(
-                "/datasets/download/{}/{}/{}",
+                "datasets/download/{}/{}/{}",
                 owner_slug, dataset_slug, file_name
             ))?)
             .header(header::ACCEPT, HeaderValue::from_static("file"));
@@ -1496,7 +1533,7 @@ impl KaggleApiClient {
         kernel_push_request: &KernelPushRequest,
     ) -> anyhow::Result<KernelPushResponse> {
         Ok(self
-            .post_json(self.join_url("/kernels/push")?, Some(kernel_push_request))
+            .post_json(self.join_url("kernels/push")?, Some(kernel_push_request))
             .await?)
     }
 

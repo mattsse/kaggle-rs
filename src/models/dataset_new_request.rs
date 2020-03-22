@@ -1,5 +1,84 @@
+use crate::archive::ArchiveMode;
+use crate::error::KaggleError;
+use crate::models::metadata::Metadata;
 use crate::models::{DatasetUploadFile, License};
+use crate::KaggleApiClient;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct DatasetNew {
+    /// The location of the metadata files, can only be empty if the dataset
+    /// does not have any resources.
+    pub dataset_folder: Option<PathBuf>,
+    /// The metadata of the dataset
+    pub metadata: Metadata,
+    /// Whether or not the dataset should be private
+    pub is_private: bool,
+    /// Whether or not a tabular dataset should be converted to csv
+    pub convert_to_csv: bool,
+    /// How to archive the files beforehand
+    pub archive_mode: ArchiveMode,
+}
+
+impl DatasetNew {
+    pub fn with_metadata(metadata: Metadata) -> Self {
+        Self {
+            dataset_folder: None,
+            metadata,
+            is_private: true,
+            convert_to_csv: true,
+            archive_mode: Default::default(),
+        }
+    }
+
+    pub async fn with_metadata_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let dataset_folder = path.as_ref().to_path_buf();
+        let mut new = Self::with_metadata(
+            KaggleApiClient::read_dataset_metadata_file(&dataset_folder).await?,
+        );
+        new.dataset_folder = Some(dataset_folder);
+        Ok(new)
+    }
+
+    pub(crate) fn validate_resources(&self) -> Result<(), KaggleError> {
+        if let Some(folder) = &self.dataset_folder {
+            self.metadata.validate_resource(folder)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn with_private(mut self, is_private: bool) -> Self {
+        self.is_private = is_private;
+        self
+    }
+
+    pub fn private(mut self) -> Self {
+        self.is_private = true;
+        self
+    }
+
+    pub fn public(mut self) -> Self {
+        self.is_private = false;
+        self
+    }
+
+    pub fn convert_to_csv(mut self, convert_to_csv: bool) -> Self {
+        self.convert_to_csv = convert_to_csv;
+        self
+    }
+
+    pub fn archive_mode(mut self, archive_mode: ArchiveMode) -> Self {
+        self.archive_mode = archive_mode;
+        self
+    }
+
+    pub fn dataset_folder(mut self, dataset_folder: impl AsRef<Path>) -> Self {
+        self.dataset_folder = Some(dataset_folder.as_ref().to_path_buf());
+        self
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,11 +98,11 @@ pub struct DatasetNewRequest {
     /// A list of files that should be associated with the dataset
     files: Vec<DatasetUploadFile>,
     /// Whether or not the dataset should be private
-    is_private: Option<bool>,
+    is_private: bool,
     /// Whether or not a tabular dataset should be converted to csv
-    convert_to_csv: Option<bool>,
+    convert_to_csv: bool,
     /// A list of tag IDs to associated with the dataset
-    category_ids: Option<Vec<String>>,
+    category_ids: Vec<String>,
 }
 
 impl DatasetNewRequest {
@@ -59,16 +138,16 @@ impl DatasetNewRequest {
         &self.files
     }
 
-    pub fn is_private(&self) -> Option<&bool> {
-        self.is_private.as_ref()
+    pub fn is_private(&self) -> bool {
+        self.is_private
     }
 
-    pub fn convert_to_csv(&self) -> Option<&bool> {
-        self.convert_to_csv.as_ref()
+    pub fn convert_to_csv(&self) -> bool {
+        self.convert_to_csv
     }
 
-    pub fn category_ids(&self) -> Option<&Vec<String>> {
-        self.category_ids.as_ref()
+    pub fn category_ids(&self) -> &Vec<String> {
+        &self.category_ids
     }
 }
 
@@ -88,11 +167,11 @@ pub struct DatasetNewRequestBuilder {
     /// A list of files that should be associated with the dataset
     files: Vec<DatasetUploadFile>,
     /// Whether or not the dataset should be private
-    is_private: Option<bool>,
+    is_private: bool,
     /// Whether or not a tabular dataset should be converted to csv
-    convert_to_csv: Option<bool>,
+    convert_to_csv: bool,
     /// A list of tag IDs to associated with the dataset
-    category_ids: Option<Vec<String>>,
+    category_ids: Vec<String>,
 }
 
 impl DatasetNewRequestBuilder {
@@ -105,9 +184,9 @@ impl DatasetNewRequestBuilder {
             subtitle: None,
             description: None,
             files: vec![],
-            is_private: None,
-            convert_to_csv: None,
-            category_ids: None,
+            is_private: true,
+            convert_to_csv: true,
+            category_ids: vec![],
         }
     }
 
@@ -151,28 +230,34 @@ impl DatasetNewRequestBuilder {
         self
     }
 
-    pub fn private(mut self, private: bool) -> Self {
-        self.is_private = Some(private);
+    pub fn with_private(mut self, is_private: bool) -> Self {
+        self.is_private = is_private;
+        self
+    }
+
+    pub fn private(mut self) -> Self {
+        self.is_private = true;
+        self
+    }
+
+    pub fn public(mut self) -> Self {
+        self.is_private = false;
         self
     }
 
     pub fn convert_to_csv(mut self, convert_to_csv: bool) -> Self {
-        self.convert_to_csv = Some(convert_to_csv);
+        self.convert_to_csv = convert_to_csv;
         self
     }
 
     pub fn category_ids(mut self, category_ids: Vec<String>) -> Self {
-        self.category_ids = Some(category_ids);
+        self.category_ids = category_ids;
         self
     }
 
     pub fn category_id(mut self, category_id: impl ToString) -> Self {
-        if let Some(ids) = self.category_ids.as_mut() {
-            ids.push(category_id.to_string());
-            self
-        } else {
-            self.category_ids(vec![category_id.to_string()])
-        }
+        self.category_ids.push(category_id.to_string());
+        self
     }
 
     pub fn build(self) -> DatasetNewRequest {

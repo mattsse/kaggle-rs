@@ -1,7 +1,6 @@
 use crate::error::KaggleError;
 use crate::models::{Collaborator, DatasetColumn, DatasetUpdateSettingsRequest, License};
 use crate::query::{PushKernelType, PushLanguageType};
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -9,10 +8,11 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub title: String,
+    pub id: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub subtitle: Option<String>,
-    pub description: String,
-    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub id_no: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -123,7 +123,6 @@ impl Metadata {
 impl Into<DatasetUpdateSettingsRequest> for Metadata {
     fn into(self) -> DatasetUpdateSettingsRequest {
         let mut settings = DatasetUpdateSettingsRequest::with_title(self.title)
-            .with_description(self.description)
             .with_licenses(self.licenses)
             .with_keywords(self.keywords)
             .with_collaborators(self.collaborators);
@@ -136,6 +135,9 @@ impl Into<DatasetUpdateSettingsRequest> for Metadata {
         if let Some(d) = self.data {
             settings.set_data(d);
         }
+        if let Some(desc) = self.description {
+            settings.set_description(desc);
+        }
         settings
     }
 }
@@ -143,7 +145,7 @@ impl Into<DatasetUpdateSettingsRequest> for Metadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
     pub path: String,
-    pub description: String,
+    pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub schema: Option<Schema>,
 }
