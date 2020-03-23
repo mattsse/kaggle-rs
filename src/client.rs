@@ -633,15 +633,14 @@ impl KaggleApiClient {
     pub async fn competition_download_leaderboard(
         &self,
         id: impl AsRef<str>,
-        output: Option<impl AsRef<Path>>,
+        output: Option<PathBuf>,
     ) -> anyhow::Result<PathBuf> {
         let id = id.as_ref();
         let output = if let Some(target) = output {
-            let target = target.as_ref();
             if target.is_dir() {
                 target.join(format!("{}-leaderboard.zip", id))
             } else {
-                target.to_path_buf()
+                target
             }
         } else {
             self.download_dir.join(format!("{}-leaderboard.zip", id))
@@ -1404,17 +1403,16 @@ impl KaggleApiClient {
     pub async fn kernels_output(
         &self,
         name: impl AsRef<str>,
-        path: Option<impl AsRef<Path>>,
+        path: Option<PathBuf>,
     ) -> anyhow::Result<Vec<PathBuf>> {
         let name = name.as_ref();
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name)?;
 
-        let folder = if let Some(path) = path {
-            path.as_ref().to_path_buf()
-        } else {
+        let folder = path.unwrap_or_else(|| {
             self.download_dir
                 .join(format!("datasets/{}/{}/output", owner_slug, kernel_slug,))
-        };
+        });
+
         fs::create_dir_all(&folder)?;
 
         let resp = self.kernel_output(name).await?;
@@ -1683,7 +1681,7 @@ impl KaggleApiClient {
     pub async fn dataset_metadata_update(
         &self,
         name: impl AsRef<str>,
-        path: Option<impl AsRef<Path>>,
+        path: Option<PathBuf>,
     ) -> anyhow::Result<serde_json::Value> {
         let name = name.as_ref();
         let metadata = if let Some(path) = path {
