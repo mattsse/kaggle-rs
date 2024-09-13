@@ -328,12 +328,12 @@ pub struct DownloadResponse {
 }
 
 mod date_serializer {
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::{DateTime, NaiveDateTime};
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     fn time_to_json(t: NaiveDateTime) -> String {
-        DateTime::<Utc>::from_utc(t, Utc).to_rfc3339()
+        t.and_utc().to_rfc3339()
     }
 
     pub fn serialize<S: Serializer>(
@@ -347,19 +347,19 @@ mod date_serializer {
         deserializer: D,
     ) -> Result<NaiveDateTime, D::Error> {
         let time: String = Deserialize::deserialize(deserializer)?;
-        Ok(DateTime::parse_from_rfc3339(&time)
+        DateTime::parse_from_rfc3339(&time)
             .map(|d| d.naive_utc())
-            .map_err(D::Error::custom)?)
+            .map_err(D::Error::custom)
     }
 }
 
 mod date_serializer_opt {
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::{DateTime, NaiveDateTime};
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     fn time_to_json(t: NaiveDateTime) -> String {
-        DateTime::<Utc>::from_utc(t, Utc).to_rfc3339()
+        t.and_utc().to_rfc3339()
     }
 
     pub fn serialize<S: Serializer>(

@@ -9,10 +9,11 @@ use std::{fs, io};
 use walkdir::{DirEntry, WalkDir};
 use zip::write::SimpleFileOptions;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum ArchiveMode {
     Tar,
     Zip,
+    #[default]
     Skip,
 }
 
@@ -45,12 +46,6 @@ impl ArchiveMode {
     }
 }
 
-impl Default for ArchiveMode {
-    fn default() -> Self {
-        ArchiveMode::Skip
-    }
-}
-
 /// unzip file into location of `to`
 pub fn unzip(file: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()> {
     let file = file.as_ref();
@@ -60,14 +55,14 @@ pub fn unzip(file: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()>
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let outpath = to.join(&file.sanitized_name());
+        let outpath = to.join(file.mangled_name());
 
-        if (&*file.name()).ends_with('/') {
+        if file.name().ends_with('/') {
             fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent() {
                 if !p.exists() {
-                    fs::create_dir_all(&p)?;
+                    fs::create_dir_all(p)?;
                 }
             }
             let mut outfile = fs::File::create(&outpath)?;
@@ -112,7 +107,7 @@ where
             let mut f = File::open(path)?;
 
             f.read_to_end(&mut buffer)?;
-            zip.write_all(&*buffer)?;
+            zip.write_all(&buffer)?;
             buffer.clear();
         } else if !name.as_os_str().is_empty() {
             // Only if not root! Avoids path spec / warning

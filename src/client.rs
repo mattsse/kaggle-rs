@@ -140,7 +140,7 @@ impl KaggleApiClientBuilder {
     pub fn build(self) -> anyhow::Result<KaggleApiClient> {
         let credentials = self
             .auth
-            .unwrap_or_else(Authentication::default)
+            .unwrap_or_default()
             .credentials()?;
 
         let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(2));
@@ -353,13 +353,13 @@ impl KaggleApiClient {
         if let Some(body) = body {
             req = req.json(body);
         }
-        Ok(Self::request_json(req).await?)
+        Self::request_json(req).await
     }
 
     async fn get_json<T: DeserializeOwned, U: IntoUrl>(&self, url: U) -> anyhow::Result<T> {
         let url = url.into_url()?;
         debug!("GET: {}", url);
-        Ok(Self::request_json(self.client.get(url)).await?)
+        Self::request_json(self.client.get(url)).await
     }
 
     async fn request_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> anyhow::Result<T> {
@@ -420,7 +420,7 @@ impl KaggleApiClient {
         req: reqwest::RequestBuilder,
         output: impl AsRef<Path>,
     ) -> anyhow::Result<PathBuf> {
-        Ok(Self::write_resp(Self::request(req).await?, output).await?)
+        Self::write_resp(Self::request(req).await?, output).await
     }
 
     pub(crate) async fn read_dataset_metadata_file(
@@ -570,7 +570,7 @@ impl KaggleApiClient {
 
             if let Some(upload) = upload {
                 let upload_file = self
-                    .upload_dataset_file(upload, &file_name, Some(&resource))
+                    .upload_dataset_file(upload, &file_name, Some(resource))
                     .await?;
                 uploads.push(upload_file);
             }
@@ -590,12 +590,12 @@ impl KaggleApiClient {
         &self,
         competition: &CompetitionsList,
     ) -> anyhow::Result<Vec<Competition>> {
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url("competitions/list")?)
                 .query(competition),
         )
-        .await?)
+        .await
     }
 
     /// Download competition leaderboard as zip file, as zip containing a csv of
@@ -646,12 +646,12 @@ impl KaggleApiClient {
             self.download_dir.join(format!("{}-leaderboard.zip", id))
         };
 
-        Ok(Self::download_file(
+        Self::download_file(
             self.client
                 .get(self.join_url(format!("competitions/{}/leaderboard/download", id))?),
             output,
         )
-        .await?)
+        .await
     }
 
     /// View a leaderboard based on a competition name
@@ -673,11 +673,11 @@ impl KaggleApiClient {
         &self,
         id: impl AsRef<str>,
     ) -> anyhow::Result<LeaderBoard> {
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url(format!("competitions/{}/leaderboard/view", id.as_ref()))?),
         )
-        .await?)
+        .await
     }
 
     /// Download a competition data file to a designated location, or to
@@ -720,7 +720,7 @@ impl KaggleApiClient {
         let file_name = file_name.as_ref();
         let output = target.unwrap_or_else(|| self.download_dir.join(format!("{}.zip", file_name)));
 
-        Ok(Self::download_file(
+        Self::download_file(
             self.client.get(self.join_url(format!(
                 "competitions/data/download/{}/{}",
                 id.as_ref(),
@@ -728,7 +728,7 @@ impl KaggleApiClient {
             ))?),
             output,
         )
-        .await?)
+        .await
     }
 
     /// Downloads all competition files and returns the location of the zip file
@@ -768,12 +768,12 @@ impl KaggleApiClient {
         let id = id.as_ref();
         let output = target.unwrap_or_else(|| self.download_dir.join(format!("{}.zip", id)));
 
-        Ok(Self::download_file(
+        Self::download_file(
             self.client
                 .get(self.join_url(format!("competitions/data/download-all/{}", id))?),
             output,
         )
-        .await?)
+        .await
     }
 
     /// List all data files for a competition
@@ -800,11 +800,11 @@ impl KaggleApiClient {
         &self,
         id: impl AsRef<str>,
     ) -> anyhow::Result<Vec<File>> {
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url(format!("competitions/data/list/{}", id.as_ref()))?),
         )
-        .await?)
+        .await
     }
 
     /// Get the list submissions for a particular competition
@@ -818,7 +818,7 @@ impl KaggleApiClient {
             .get(self.join_url(format!("competitions/submissions/list/{}", id.as_ref()))?)
             .query(&[("page", page)]);
 
-        Ok(Self::request_json(req).await?)
+        Self::request_json(req).await
     }
 
     /// Submit to competition.
@@ -832,12 +832,12 @@ impl KaggleApiClient {
             .text("blobFileTokens", blob_file_tokens.to_string())
             .text("submissionDescription", submission_description.to_string());
 
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .post(self.join_url(format!("competitions/submissions/submit/{}", id.as_ref()))?)
                 .multipart(form),
         )
-        .await?)
+        .await
     }
 
     /// Submit a competition.
@@ -849,7 +849,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<SubmitResult> {
         let competition = competition.as_ref();
         let file = file.as_ref();
-        let (content_length, last_modified) = Self::get_file_metadata(&file)?;
+        let (content_length, last_modified) = Self::get_file_metadata(file)?;
 
         let file_name = file
             .file_name()
@@ -903,9 +903,9 @@ impl KaggleApiClient {
             .and_then(serde_json::Value::as_str)
             .context("Missing upload token")?;
 
-        Ok(self
+        self
             .competitions_submissions_submit(competition, token, message)
-            .await?)
+            .await
     }
 
     async fn upload_complete(
@@ -915,12 +915,12 @@ impl KaggleApiClient {
     ) -> anyhow::Result<reqwest::Response> {
         let stream = into_bytes_stream(tokio::fs::File::open(file).await?);
 
-        Ok(Self::request(
+        Self::request(
             self.client
                 .put(url)
                 .body(reqwest::Body::wrap_stream(stream)),
         )
-        .await?)
+        .await
     }
 
     /// Upload competition submission file
@@ -948,7 +948,7 @@ impl KaggleApiClient {
             ))?)
             .multipart(form);
 
-        Ok(Self::request_json(req).await?)
+        Self::request_json(req).await
     }
 
     /// Generate competition submission URL
@@ -970,7 +970,7 @@ impl KaggleApiClient {
                 last_modified_date_utc.as_secs()
             ))?)
             .multipart(form);
-        Ok(Self::request_json(req).await?)
+        Self::request_json(req).await
     }
 
     /// Create a new dataset meaning the same as creating a version but with
@@ -1083,7 +1083,7 @@ impl KaggleApiClient {
             request = request.description(desc);
         }
 
-        Ok(self.datasets_create_new(&request.build()).await?)
+        self.datasets_create_new(&request.build()).await
     }
 
     /// Create a new dataset.
@@ -1091,9 +1091,9 @@ impl KaggleApiClient {
         &self,
         new_dataset: &DatasetNewRequest,
     ) -> anyhow::Result<DatasetNewResponse> {
-        Ok(self
+        self
             .post_json(self.join_url("datasets/create/new")?, Some(new_dataset))
-            .await?)
+            .await
     }
 
     /// Create a new dataset version
@@ -1154,7 +1154,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<DatasetNewVersionResponse> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name)?;
 
-        Ok(self
+        self
             .post_json(
                 self.join_url(format!(
                     "datasets/create/version/{}/{}",
@@ -1162,7 +1162,7 @@ impl KaggleApiClient {
                 ))?,
                 Some(dataset_req),
             )
-            .await?)
+            .await
     }
 
     /// Create a new dataset version by id
@@ -1171,12 +1171,12 @@ impl KaggleApiClient {
         id: i32,
         dataset_req: &DatasetNewVersionRequest,
     ) -> anyhow::Result<DatasetNewVersionResponse> {
-        Ok(self
+        self
             .post_json(
                 self.join_url(format!("datasets/create/version/{}", id))?,
                 Some(dataset_req),
             )
-            .await?)
+            .await
     }
 
     /// Download all files of a dataset.
@@ -1276,7 +1276,7 @@ impl KaggleApiClient {
 
         // TODO check if file is already available and is older than the Last-Modified
         // header value
-        Ok(Self::write_resp(resp, outfile).await?)
+        Self::write_resp(resp, outfile).await
     }
 
     /// List datasets
@@ -1302,10 +1302,8 @@ impl KaggleApiClient {
     /// }
     /// ```
     pub async fn datasets_list(&self, list: &DatasetsList) -> anyhow::Result<Vec<Dataset>> {
-        Ok(
-            Self::request_json(self.client.get(self.join_url("datasets/list")?).query(list))
-                .await?,
-        )
+        Self::request_json(self.client.get(self.join_url("datasets/list")?).query(list))
+                .await
     }
 
     /// List all files for a dataset.
@@ -1352,11 +1350,11 @@ impl KaggleApiClient {
         name: impl AsRef<str>,
     ) -> anyhow::Result<ListFilesResult> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url(format!("datasets/list/{}/{}", owner_slug, dataset_slug))?),
         )
-        .await?)
+        .await
     }
 
     /// Get dataset creation status.
@@ -1365,9 +1363,9 @@ impl KaggleApiClient {
         name: impl AsRef<str>,
     ) -> anyhow::Result<Option<serde_json::Value>> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(self
+        self
             .get_json(self.join_url(format!("datasets/status/{}/{}", owner_slug, dataset_slug))?)
-            .await?)
+            .await
     }
 
     /// Get URL and token to start uploading a data file.
@@ -1379,7 +1377,7 @@ impl KaggleApiClient {
     ) -> anyhow::Result<FileUploadInfo> {
         let form = multipart::Form::new().text("fileName", file_name.to_string());
 
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .post(self.join_url(format!(
                     "datasets/upload/file/{}/{}",
@@ -1388,15 +1386,15 @@ impl KaggleApiClient {
                 ))?)
                 .multipart(form),
         )
-        .await?)
+        .await
     }
 
     /// Show details about a dataset.
     pub async fn datasets_view(&self, name: impl AsRef<str>) -> anyhow::Result<Dataset> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(self
+        self
             .get_json(self.join_url(format!("datasets/view/{}/{}", owner_slug, dataset_slug))?)
-            .await?)
+            .await
     }
 
     /// Retrieve output for a specified kernel.
@@ -1451,23 +1449,23 @@ impl KaggleApiClient {
             .into());
         }
 
-        Ok(self
+        self
             .get_json(self.join_url(format!(
                 "kernels/output?userName={}&kernelSlug={}",
                 owner_slug, kernel_slug
             ))?)
-            .await?)
+            .await
     }
 
     /// Pull the latest code from a kernel.
     pub async fn kernel_pull(&self, name: impl AsRef<str>) -> anyhow::Result<KernelPullResponse> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(self
+        self
             .get_json(self.join_url(format!(
                 "kernels/pull?userName={}&kernelSlug={}",
                 owner_slug, kernel_slug
             ))?)
-            .await?)
+            .await
     }
 
     /// Pull a kernel, including a metadata file (if metadata is True) and
@@ -1617,7 +1615,7 @@ impl KaggleApiClient {
             req.set_is_private(is_private);
         }
 
-        Ok(self.kernel_push(&req).await?)
+        self.kernel_push(&req).await
     }
 
     /// Push a new kernel version. Can be used to create a new kernel and update
@@ -1626,19 +1624,19 @@ impl KaggleApiClient {
         &self,
         kernel_push_request: &KernelPushRequest,
     ) -> anyhow::Result<KernelPushResponse> {
-        Ok(self
+        self
             .post_json(self.join_url("kernels/push")?, Some(kernel_push_request))
-            .await?)
+            .await
     }
 
     /// Get the status of a kernel.
     pub async fn kernel_status(&self, name: impl AsRef<str>) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, kernel_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(Self::request_json(self.client.get(self.join_url(format!(
+        Self::request_json(self.client.get(self.join_url(format!(
             "kernels/status?userName={}&kernelSlug={}",
             owner_slug, kernel_slug
         ))?))
-        .await?)
+        .await
     }
 
     /// List kernels based on a set of search criteria.
@@ -1659,22 +1657,22 @@ impl KaggleApiClient {
     /// }
     /// ```
     pub async fn kernels_list(&self, kernel_list: &KernelsList) -> anyhow::Result<Vec<Kernel>> {
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url("kernels/list")?)
                 .query(kernel_list),
         )
-        .await?)
+        .await
     }
 
     /// Get the metadata for a dataset.
     pub async fn metadata_get(&self, name: impl AsRef<str>) -> anyhow::Result<DatasetMetadata> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
-        Ok(Self::request_json(
+        Self::request_json(
             self.client
                 .get(self.join_url(format!("datasets/metadata/{}/{}", owner_slug, dataset_slug))?),
         )
-        .await?)
+        .await
     }
 
     /// Update the metadata for a dataset
@@ -1696,7 +1694,7 @@ impl KaggleApiClient {
         };
 
         let settings = metadata.into();
-        Ok(self.metadata_post(name, &settings).await?)
+        self.metadata_post(name, &settings).await
     }
 
     pub async fn metadata_post(
@@ -1706,12 +1704,12 @@ impl KaggleApiClient {
     ) -> anyhow::Result<serde_json::Value> {
         let (owner_slug, dataset_slug) = self.get_user_and_identifier_slug(name.as_ref())?;
 
-        Ok(self
+        self
             .post_json(
                 self.join_url(format!("datasets/metadata/{}/{}", owner_slug, dataset_slug))?,
                 Some(settings),
             )
-            .await?)
+            .await
     }
 }
 

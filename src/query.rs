@@ -38,7 +38,9 @@ pub enum PushLanguageType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum Language {
+    #[default]
     All,
     Python,
     R,
@@ -47,44 +49,35 @@ pub enum Language {
     Rmarkdown,
 }
 
-impl Default for Language {
-    fn default() -> Self {
-        Language::All
-    }
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum KernelType {
+    #[default]
     All,
     Script,
     Notebook,
 }
 
-impl Default for KernelType {
-    fn default() -> Self {
-        KernelType::All
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum OutputType {
+    #[default]
     All,
     Visualization,
     Data,
 }
 
-impl Default for OutputType {
-    fn default() -> Self {
-        OutputType::All
-    }
-}
 
 /// How to sort the result
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum SortBy {
+    #[default]
     Hotness,
     CommentCount,
     DateCreated,
@@ -96,30 +89,24 @@ pub enum SortBy {
     VoteCount,
 }
 
-impl Default for SortBy {
-    fn default() -> Self {
-        SortBy::Hotness
-    }
-}
 
 /// Competitoins valid types
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum CompetitionGroup {
+    #[default]
     General,
     Entered,
     InClass,
 }
 
-impl Default for CompetitionGroup {
-    fn default() -> Self {
-        CompetitionGroup::General
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum CompetitionCategory {
+    #[default]
     All,
     Featured,
     Research,
@@ -129,33 +116,27 @@ pub enum CompetitionCategory {
     Playground,
 }
 
-impl Default for CompetitionCategory {
-    fn default() -> Self {
-        CompetitionCategory::All
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum CompetitionSortBy {
     Grouped,
     Prize,
     EarliestDeadline,
+    #[default]
     LatestDeadline,
     NumberOfTeams,
     RecentlyCreated,
 }
 
-impl Default for CompetitionSortBy {
-    fn default() -> Self {
-        CompetitionSortBy::LatestDeadline
-    }
-}
 
 /// Datasets valid types
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum DatasetFileType {
+    #[default]
     All,
     Csv,
     Sqlite,
@@ -163,15 +144,12 @@ pub enum DatasetFileType {
     BigQuery,
 }
 
-impl Default for DatasetFileType {
-    fn default() -> Self {
-        DatasetFileType::All
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum DatasetLicenseName {
+    #[default]
     All,
     Cc,
     Gpl,
@@ -179,11 +157,6 @@ pub enum DatasetLicenseName {
     Other,
 }
 
-impl Default for DatasetLicenseName {
-    fn default() -> Self {
-        DatasetLicenseName::All
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -197,27 +170,21 @@ pub enum DatasetSortBy {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum Group {
+    #[default]
     Everyone,
     Profile,
 }
 
-impl Default for Group {
-    fn default() -> Self {
-        Group::Everyone
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub(crate) enum DatasetGroup {
+    #[default]
     Public,
     My,
     User,
 }
 
-impl Default for DatasetGroup {
-    fn default() -> Self {
-        DatasetGroup::Public
-    }
-}

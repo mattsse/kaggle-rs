@@ -120,22 +120,22 @@ impl Metadata {
     }
 }
 
-impl Into<DatasetUpdateSettingsRequest> for Metadata {
-    fn into(self) -> DatasetUpdateSettingsRequest {
-        let mut settings = DatasetUpdateSettingsRequest::with_title(self.title)
-            .with_licenses(self.licenses)
-            .with_keywords(self.keywords)
-            .with_collaborators(self.collaborators);
-        if let Some(s) = self.subtitle {
+impl From<Metadata> for DatasetUpdateSettingsRequest {
+    fn from(val: Metadata) -> Self {
+        let mut settings = DatasetUpdateSettingsRequest::with_title(val.title)
+            .with_licenses(val.licenses)
+            .with_keywords(val.keywords)
+            .with_collaborators(val.collaborators);
+        if let Some(s) = val.subtitle {
             settings.set_subtitle(s);
         }
-        if let Some(p) = self.is_private {
+        if let Some(p) = val.is_private {
             settings.set_is_private(p);
         }
-        if let Some(d) = self.data {
+        if let Some(d) = val.data {
             settings.set_data(d);
         }
-        if let Some(desc) = self.description {
+        if let Some(desc) = val.description {
             settings.set_description(desc);
         }
         settings
