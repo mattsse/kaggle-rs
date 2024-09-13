@@ -7,7 +7,7 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use walkdir::{DirEntry, WalkDir};
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ArchiveMode {
@@ -98,7 +98,7 @@ where
 {
     let prefix = prefix.as_ref();
     let mut zip = zip::ZipWriter::new(writer);
-    let options = FileOptions::default().unix_permissions(0o755);
+    let options = SimpleFileOptions::default().unix_permissions(0o755);
 
     let mut buffer = Vec::new();
     for entry in it {
