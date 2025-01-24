@@ -48,6 +48,7 @@ use crate::models::{
 use crate::query::{PushKernelType, PushLanguageType};
 use crate::request::{CompetitionsList, DatasetsList, KernelPullRequest, KernelsList};
 use std::collections::HashMap;
+use base64::engine::general_purpose::STANDARD;
 use tempdir::TempDir;
 
 use log::debug;
@@ -149,7 +150,7 @@ impl KaggleApiClientBuilder {
         {
             // See [`reqwest::Request`]
             let mut encoder =
-                base64::write::EncoderWriter::new(&mut header_value, base64::STANDARD);
+                base64::write::EncoderWriter::new(&mut header_value, &STANDARD);
             write!(encoder, "{}:", &credentials.username)?;
             write!(encoder, "{}", &credentials.key)?;
         }
