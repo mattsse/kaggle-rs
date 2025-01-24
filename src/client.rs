@@ -384,6 +384,7 @@ impl KaggleApiClient {
     /// Execute the request.
     async fn request(req: reqwest::RequestBuilder) -> anyhow::Result<reqwest::Response> {
         let resp = req.send().await?;
+        debug!("Response: {:?}", req);
 
         if resp.status().is_success() {
             Ok(resp)
