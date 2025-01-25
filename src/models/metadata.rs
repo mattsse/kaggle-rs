@@ -8,6 +8,7 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub title: String,
+    #[serde(rename = "datasetId")]
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub subtitle: Option<String>,

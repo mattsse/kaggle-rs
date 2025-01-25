@@ -109,7 +109,7 @@ pub struct Tag {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DatasetMetadata {
+pub struct DatasetMetadataInfo {
     pub dataset_id: i64,
     pub dataset_slug: String,
     pub owner_user: ::serde_json::Value,
@@ -125,6 +125,11 @@ pub struct DatasetMetadata {
     pub keywords: Vec<String>,
     pub collaborators: Vec<Collaborator>,
     pub data: Vec<MetadataData>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetMetadata {
+    pub info: DatasetMetadataInfo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -386,5 +391,15 @@ mod date_serializer_opt {
         } else {
             Ok(None)
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    const DATASET_META_DATA: &str = include_str!("tests/dataset_metadata.json");
+    #[test]
+    fn read_dataset_metadata() {
+        let _: DatasetMetadata =
+            serde_json::from_str(DATASET_META_DATA).expect("failed to parse dataset metadata");
     }
 }

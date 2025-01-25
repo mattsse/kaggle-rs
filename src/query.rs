@@ -49,7 +49,6 @@ pub enum Language {
     Rmarkdown,
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -60,7 +59,6 @@ pub enum KernelType {
     Notebook,
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -70,7 +68,6 @@ pub enum OutputType {
     Visualization,
     Data,
 }
-
 
 /// How to sort the result
 #[derive(Debug, Clone, Serialize)]
@@ -89,7 +86,6 @@ pub enum SortBy {
     VoteCount,
 }
 
-
 /// Competitoins valid types
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,7 +96,6 @@ pub enum CompetitionGroup {
     Entered,
     InClass,
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,7 +111,6 @@ pub enum CompetitionCategory {
     Playground,
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -129,7 +123,6 @@ pub enum CompetitionSortBy {
     NumberOfTeams,
     RecentlyCreated,
 }
-
 
 /// Datasets valid types
 #[derive(Debug, Clone, Serialize)]
@@ -144,7 +137,6 @@ pub enum DatasetFileType {
     BigQuery,
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -156,7 +148,6 @@ pub enum DatasetLicenseName {
     Odb,
     Other,
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -177,7 +168,6 @@ pub enum Group {
     Profile,
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -187,4 +177,3 @@ pub(crate) enum DatasetGroup {
     My,
     User,
 }
-

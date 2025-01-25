@@ -41,3 +41,34 @@ pub mod query;
 pub mod request;
 
 pub use client::{Authentication, KaggleApiClient, KaggleApiClientBuilder};
+
+#[cfg(test)]
+mod tests {
+    use crate::KaggleApiClient;
+    use std::path::Path;
+
+    #[tokio::test]
+    #[ignore]
+    async fn read_dataset_metadata() -> anyhow::Result<()> {
+        env_logger::init();
+        let kaggle = KaggleApiClient::builder().build()?;
+        let _metadata = kaggle
+            .metadata_get("mczielinski/bitcoin-historical-data")
+            .await?;
+        Ok(())
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn download_dataset() -> anyhow::Result<()> {
+        env_logger::init();
+        let kaggle = KaggleApiClient::builder().build()?;
+        let _metadata = kaggle
+            .dataset_download_all_files(
+                "mczielinski/bitcoin-historical-data",
+                Some(Path::new("/tmp/").to_path_buf()),
+                None,
+            )
+            .await?;
+        Ok(())
+    }
+}
