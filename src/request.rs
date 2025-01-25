@@ -1,17 +1,8 @@
 use serde::Serialize;
 
 use crate::query::{
-    CompetitionCategory,
-    CompetitionGroup,
-    CompetitionSortBy,
-    DatasetFileType,
-    DatasetGroup,
-    DatasetLicenseName,
-    Group,
-    KernelType,
-    Language,
-    OutputType,
-    SortBy,
+    CompetitionCategory, CompetitionGroup, CompetitionSortBy, DatasetFileType, DatasetGroup,
+    DatasetLicenseName, Group, KernelType, Language, OutputType, SortBy,
 };
 use std::path::{Path, PathBuf};
 
