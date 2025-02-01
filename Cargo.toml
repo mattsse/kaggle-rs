@@ -1,6 +1,6 @@
 [package]
 name = "kaggle"
-version = "1.0.4"
+version = "2.0.0"
 authors = ["Matthias Seitz <matthias.seitz@tum.de>"]
 edition = "2018"
 license = "Apache-2.0"
